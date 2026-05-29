@@ -1222,7 +1222,7 @@ function renderNow(){
       ${futureAgendaHtml}`
       :`<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
         <div style="font-size:13px;color:var(--color-text-secondary)">No future meetings scheduled.</div>
-        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel('calendarPanel',document.getElementById('calendarTab'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
+        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel(\'calendarPanel\',document.getElementById(\'calendarTab\'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
       </div>`}
     </div>`;return;
   }
