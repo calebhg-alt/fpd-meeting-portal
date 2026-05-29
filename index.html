@@ -692,11 +692,13 @@ function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
 // ── Init ──
 function init(){
   MEMBERS_SEED.forEach((m,i)=>S.members.push({id:m.id,name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
-  // seed initial agenda
   seedAgenda('2026-04-22');
-  // load Firebase archive
-  ARCHIVE_REF.once('value').then(snap=>{const d=snap.val();if(d)S.archive=Object.values(d);renderPastMinutes();});
-  buildLoginDropdown();updateBannerText();
+  // load Firebase archive only if available
+  if(_fbAvailable&&ARCHIVE_REF){
+    ARCHIVE_REF.once('value').then(snap=>{const d=snap.val();if(d)S.archive=Object.values(d);renderPastMinutes();});
+  }
+  buildLoginDropdown();
+  updateBannerText();
 }
 
 function seedAgenda(lastMeetingDate){
@@ -850,7 +852,7 @@ function concludeMeeting(){
       // push next-meeting notification to all devices
       const notif={id:'notif_conclude_'+Date.now(),type:'info',title:'Meeting concluded',sub:'Next meeting: '+fmtDateShort(next.date)+(next.start?' at '+next.start:''),itemTitle:'Meeting concluded',result:'info'};
       S.lastNotifId=notif.id;
-      NOTIF_REF.set(notif);
+      if(_fbAvailable&&NOTIF_REF)NOTIF_REF.set(notif);
       showToast(notif);
       // advance state to next meeting (reuses advanceToNextMeeting logic)
       advanceToNextMeeting();
@@ -913,6 +915,7 @@ function saveAgendaToArchive(){
   const dateLabel=fmtDateShort(S.mtg.date);
   const id='archive_agenda_'+S.mtg.date.replace(/-/g,'');
   const entry={id,label:'Agenda — '+dateLabel,type:'agenda',date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
+  if(!_fbAvailable)return;
   ARCHIVE_REF.child(id).set(entry);
   const idx=S.archive.findIndex(a=>a.id===id);
   if(idx>=0)S.archive[idx]=entry;else S.archive.unshift(entry);
@@ -1421,6 +1424,7 @@ function addFutureItemModal(){
   const items=S.futureAgendas[_futModalDateKey]?Object.values(S.futureAgendas[_futModalDateKey]):[];
   const order=items.length;
   const id='fi_'+uid();
+  if(!_fbAvailable)return;
   FUTURE_REF.child(_futModalDateKey).child(id).set({id,title,type,desc,order}).then(()=>{
     document.getElementById('futNewTitle').value='';
     document.getElementById('futNewDesc').value='';
@@ -1433,6 +1437,7 @@ function editFutureItem(dateKey,id){
   const newTitle=prompt('Edit item title:',fi.title);
   if(newTitle===null)return;
   const newDesc=prompt('Edit description (optional):',fi.desc||'');
+  if(!_fbAvailable)return;
   FUTURE_REF.child(dateKey).child(id).update({title:newTitle.trim()||fi.title,desc:newDesc||''});
 }
 
@@ -1444,7 +1449,7 @@ function moveFutureItem(dateKey,id,dir){
   const updates={};
   updates[items[idx].id+'/order']=swapIdx;
   updates[items[swapIdx].id+'/order']=idx;
-  FUTURE_REF.child(dateKey).update(updates);
+  if(_fbAvailable)FUTURE_REF.child(dateKey).update(updates);
 }
 
 // ── Vote actions ──
@@ -1543,7 +1548,7 @@ function uploadMinutes(e){
     const dateStr=m?m[0]:'Unknown date';
     const id='archive_upload_'+uid();
     const entry={id,label:dateStr+' (uploaded)',type:'upload',date:dateStr,savedAt:new Date().toLocaleString(),text,uploaded:true};
-    ARCHIVE_REF.child(id).set(entry).then(()=>{S.archive.unshift(entry);renderPastMinutes();});
+    if(_fbAvailable&&ARCHIVE_REF){ARCHIVE_REF.child(id).set(entry).then(()=>{S.archive.unshift(entry);renderPastMinutes();});}else{S.archive.unshift(entry);renderPastMinutes();}
     e.target.value='';
   };r.readAsText(f);
 }
