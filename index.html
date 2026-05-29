@@ -1463,13 +1463,9 @@ function selfSelectMotion(aid,role){
   if(role==='move'){if(a.motioner===mid){a.motioner=''}else if(!a.motioner){a.motioner=mid}else return}
   else{if(!a.motioner||a.motioner===mid)return;if(a.seconder===mid){a.seconder=''}else if(!a.seconder){a.seconder=mid}else return}
   if(a.motioner&&a.seconder){
-    // Only auto-close if voting is already open — otherwise just record mover/seconder
-    if(a.voteOpen){
-      addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Voting closed automatically.','note');
-      autoCloseVoting(a);
-    } else {
-      addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'.','note');
-    }
+    // Just record mover/seconder — never auto-close here
+    // Auto-close only happens when chair marks item done
+    addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'.','note');
   }
   pushToFirebase();renderNow();renderAgenda();renderMinutes();
 }
