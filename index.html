@@ -365,44 +365,44 @@ const VOTE_LABELS={yes:'Yes',no:'No',abstain:'Abstain',absent:'Absent'};
 const VOTE_CHIP_CLS={yes:'vc-yes',no:'vc-no',abstain:'vc-abstain',absent:'vc-absent'};
 
 const MEMBERS_SEED=[
-  {name:'Kathy Osburn',role:'Faculty Co-Chair'},
-  {name:'Van Rider',role:'Administrative Co-Chair'},
-  {name:'Nathan Dillon',role:'Administrative Council Member'},
-  {name:'James Nasipak',role:'CMSA Representative'},
-  {name:'Greg Krynen',role:'Technical Liaison'},
-  {name:'VACANT',role:'Classified Representative',vacant:true},
-  {name:"Darlene O'Keeffe",role:'Academic Senate Coordinator'},
-  {name:'Noah Stepro',role:'Adjunct Representative'},
-  {name:'Wayne Lynch',role:'Faculty Union Representative'},
-  {name:'Ruben Alcala',role:'Faculty Rep, Counseling'},
-  {name:'Katherine Quesada',role:'Faculty Rep, Counseling'},
-  {name:'VACANT',role:'Faculty Rep, CTE',vacant:true},
-  {name:'Caleb Healey',role:'Faculty Rep, CTE'},
-  {name:'Rona Brynin',role:'Faculty Rep, HSS'},
-  {name:'VACANT',role:'Faculty Rep, HSS',vacant:true},
-  {name:'Dr. Billy Cheewawisuttichai',role:'Faculty Rep, MSE'},
-  {name:'Jane Bowers',role:'Faculty Rep, MSE'},
-  {name:'Mark Hoffer',role:'Faculty Rep, L&CA'},
-  {name:'Dr. Morenike Adebayo-Ige',role:'Faculty Rep, L&CA'},
-  {name:'Glen Knowles',role:'Faculty Rep, A&H'},
-  {name:'VACANT',role:'Faculty Rep, A&H',vacant:true},
-  {name:'Kent Moser',role:'Faculty Rep, SBS'},
-  {name:'Ken Schafer',role:'Faculty Rep, SBS'},
-  {name:'Carrie Miller',role:'Faculty Rep, AKIN'},
-  {name:'VACANT',role:'Faculty Rep, AKIN',vacant:true},
-  {name:'VACANT',role:'ASO Rep',vacant:true}
+  {id:'m01',name:'Kathy Osburn',role:'Faculty Co-Chair'},
+  {id:'m02',name:'Van Rider',role:'Administrative Co-Chair'},
+  {id:'m03',name:'Nathan Dillon',role:'Administrative Council Member'},
+  {id:'m04',name:'James Nasipak',role:'CMSA Representative'},
+  {id:'m05',name:'Greg Krynen',role:'Technical Liaison'},
+  {id:'m06',name:'VACANT',role:'Classified Representative',vacant:true},
+  {id:'m07',name:"Darlene O'Keeffe",role:'Academic Senate Coordinator'},
+  {id:'m08',name:'Noah Stepro',role:'Adjunct Representative'},
+  {id:'m09',name:'Wayne Lynch',role:'Faculty Union Representative'},
+  {id:'m10',name:'Ruben Alcala',role:'Faculty Rep, Counseling'},
+  {id:'m11',name:'Katherine Quesada',role:'Faculty Rep, Counseling'},
+  {id:'m12',name:'VACANT',role:'Faculty Rep, CTE',vacant:true},
+  {id:'m13',name:'Caleb Healey',role:'Faculty Rep, CTE'},
+  {id:'m14',name:'Rona Brynin',role:'Faculty Rep, HSS'},
+  {id:'m15',name:'VACANT',role:'Faculty Rep, HSS',vacant:true},
+  {id:'m16',name:'Dr. Billy Cheewawisuttichai',role:'Faculty Rep, MSE'},
+  {id:'m17',name:'Jane Bowers',role:'Faculty Rep, MSE'},
+  {id:'m18',name:'Mark Hoffer',role:'Faculty Rep, L&CA'},
+  {id:'m19',name:'Dr. Morenike Adebayo-Ige',role:'Faculty Rep, L&CA'},
+  {id:'m20',name:'Glen Knowles',role:'Faculty Rep, A&H'},
+  {id:'m21',name:'VACANT',role:'Faculty Rep, A&H',vacant:true},
+  {id:'m22',name:'Kent Moser',role:'Faculty Rep, SBS'},
+  {id:'m23',name:'Ken Schafer',role:'Faculty Rep, SBS'},
+  {id:'m24',name:'Carrie Miller',role:'Faculty Rep, AKIN'},
+  {id:'m25',name:'VACANT',role:'Faculty Rep, AKIN',vacant:true},
+  {id:'m26',name:'VACANT',role:'ASO Rep',vacant:true}
 ];
 
 const AGENDA_SEED=[
-  {title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for the May 27, 2026 meeting.'},
-  {title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair Kathy Osburn and Administrative Co-Chair Van Rider.'},
-  {title:'Open Comments from the Public',type:'public',desc:'Public comment period.'},
-  {title:'Approval of Previous Minutes — April 22, 2026',type:'action',desc:'Motion to approve the minutes from the April 22, 2026 meeting.'},
-  {title:'Approval of Previous Minutes — May 13, 2026',type:'action',desc:'Motion to approve the minutes from the May 13, 2026 meeting.'},
-  {title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.'},
-  {title:'FEP Reports — Vote',type:'action',desc:'Action item: FEP Reports. Vote required.'},
-  {title:'FPD Credit for Scholarship Review for our Foundation',type:'action',desc:'Action item: FPD Credit for Scholarship Review. Vote required.'},
-  {title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.'}
+  {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for the May 27, 2026 meeting.'},
+  {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair Kathy Osburn and Administrative Co-Chair Van Rider.'},
+  {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.'},
+  {id:'a04',title:'Approval of Previous Minutes — April 22, 2026',type:'action',desc:'Motion to approve the minutes from the April 22, 2026 meeting.'},
+  {id:'a05',title:'Approval of Previous Minutes — May 13, 2026',type:'action',desc:'Motion to approve the minutes from the May 13, 2026 meeting.'},
+  {id:'a06',title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.'},
+  {id:'a07',title:'FEP Reports — Vote',type:'action',desc:'Action item: FEP Reports. Vote required.'},
+  {id:'a08',title:'FPD Credit for Scholarship Review for our Foundation',type:'action',desc:'Action item: FPD Credit for Scholarship Review. Vote required.'},
+  {id:'a09',title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.'}
 ];
 
 // ═══════════════════════════════════════════════
@@ -538,8 +538,8 @@ function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
 //  INIT
 // ═══════════════════════════════════════════════
 function init(){
-  MEMBERS_SEED.forEach((m,i)=>S.members.push({id:uid(),name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
-  AGENDA_SEED.forEach(a=>S.agenda.push({id:uid(),title:a.title,type:a.type,desc:a.desc,status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''}));
+  MEMBERS_SEED.forEach((m,i)=>S.members.push({id:m.id,name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
+  AGENDA_SEED.forEach(a=>S.agenda.push({id:a.id,title:a.title,type:a.type,desc:a.desc,status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''}));
   // Load archive from Firebase
   ARCHIVE_REF.once('value').then(snap=>{const d=snap.val();if(d)S.archive=Object.values(d);renderPastMinutes();});
   buildLoginDropdown();updateBannerText();
