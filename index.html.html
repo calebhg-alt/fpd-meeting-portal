@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AVC FPD Committee Meeting Portal</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  /* AVC palette: teal #4E9BAD | maroon #7A2E43 | orange #E8741A */
   --color-background-primary:#ffffff;
   --color-background-secondary:#f0f6f8;
   --color-background-danger:#f9eaed;
@@ -28,7 +30,6 @@
   --color-border-danger:#c47a8a;
   --border-radius-md:6px;--border-radius-lg:10px;
 }
-/* dark mode not applied — AVC light theme only */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:var(--font-sans);background:var(--color-background-primary);color:var(--color-text-primary)}
@@ -37,7 +38,6 @@ body{font-family:var(--font-sans);background:var(--color-background-primary);col
 .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;background:linear-gradient(160deg,#e8f5f8 0%,#f8fbfc 60%,#fdf4ef 100%)}
 .login-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:2rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(78,155,173,.15);border-top:3px solid #4E9BAD}
 .login-logo{text-align:center;margin-bottom:1.5rem}
-.login-logo-icon{font-size:36px;color:var(--color-text-secondary);margin-bottom:8px;display:block}
 .login-title{font-size:17px;font-weight:600;color:var(--color-text-primary)}
 .login-sub{font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5}
 .fl{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:5px;margin-top:14px}
@@ -56,6 +56,9 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .pill-adj{background:#f5dde3;color:#7A2E43;border-color:#c47a8a}
 .live-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#d6edf2;color:#1e5e6e;border:0.5px solid #4E9BAD}
 .live-dot{width:7px;height:7px;border-radius:50%;background:#4E9BAD;animation:blink 1s infinite}
+/* sync indicator */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#4E9BAD;display:inline-block;margin-right:4px}
+.sync-dot.offline{background:#c47a8a}
 .nav{display:flex;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:1.25rem;overflow-x:auto}
 .nav-tab{padding:8px 12px;font-size:13px;cursor:pointer;color:var(--color-text-secondary);border-bottom:2px solid transparent;margin-bottom:-0.5px;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
 .nav-tab.active{color:#2a6e80;font-weight:600;border-bottom-color:#4E9BAD}
@@ -95,11 +98,12 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .t-yes{background:#4E9BAD;color:#fff}.t-no{background:#7A2E43;color:#fff}.t-abs{background:#E8741A;color:#fff}.t-absent{background:#888780;color:#fff}
 .tally-divider{width:1px;height:20px;background:var(--color-border-secondary);flex-shrink:0}
 .result-inline{font-size:13px;font-weight:700;padding:5px 16px;border-radius:999px;display:inline-flex;align-items:center;gap:5px}
-.ri-passed{background:#4E9BAD;color:#fff}.ri-failed{background:#7A2E43;color:#fff}.ri-tied{background:#E8741A;color:#fff}.ri-pending{background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)}
+.ri-passed{background:#4E9BAD;color:#fff}.ri-failed{background:#7A2E43;color:#fff}.ri-tied{background:#E8741A;color:#fff}
+.ri-pending{background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)}
 .member-card{display:flex;align-items:center;gap:10px;padding:9px 14px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:7px;background:var(--color-background-primary)}
 .member-card.vacant-card{opacity:.5}
 .avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
-.av-blue{background:#E6F1FB;color:#0C447C}.av-teal{background:#E1F5EE;color:#085041}.av-purple{background:#EEEDFE;color:#3C3489}
+.av-blue{background:#E6F1FB;color:#0C447C}.av-teal{background:#d6edf2;color:#1e5e6e}.av-purple{background:#EEEDFE;color:#3C3489}
 .av-coral{background:#FAECE7;color:#712B13}.av-amber{background:#FAEEDA;color:#633806}.av-green{background:#EAF3DE;color:#27500A}.av-gray{background:#F1EFE8;color:#444441}
 .member-info{flex:1;min-width:0}
 .member-name{font-size:13px;font-weight:500;color:var(--color-text-primary);line-height:1.3}
@@ -129,7 +133,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .vote-roll td{padding:6px 8px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
 .vote-roll tr:last-child td{border-bottom:none}
 .me-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
-.me-note{background:#888780}.me-motion{background:#378ADD}.me-decision{background:#4a9c2e}.me-action{background:#d4860a}
+.me-note{background:#888780}.me-motion{background:#4E9BAD}.me-decision{background:#4E9BAD}.me-action{background:#E8741A}
 .minute-entry{display:flex;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);align-items:flex-start}
 .minute-entry:last-child{border-bottom:none}
 .me-text{font-size:13px;color:var(--color-text-primary);flex:1;line-height:1.5}
@@ -156,7 +160,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .ag-nav-btn.ag-nav-done .ag-nav-label{color:#1e5e6e}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:1.5rem;width:360px;max-width:95%;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:1.5rem;width:360px;max-width:95%;box-shadow:0 8px 32px rgba(78,155,173,.15)}
 .modal h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:1rem}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem}
 .mfl{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;margin-top:10px}
@@ -171,21 +175,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .save-banner{background:#d6edf2;border:0.5px solid #4E9BAD;border-radius:var(--border-radius-md);padding:10px 14px;font-size:13px;color:#1e5e6e;display:none;margin-bottom:1rem;align-items:center;gap:8px}
 .save-banner.show{display:flex}
 .next-mtg{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 14px;font-size:13px;color:var(--color-text-secondary);margin-top:1rem}
-
-/* ── Watermark ── */
-.watermark{
-  position:fixed;
-  bottom:12px;
-  right:16px;
-  font-size:11px;
-  font-weight:500;
-  color:rgba(78,155,173,.45);
-  letter-spacing:.04em;
-  pointer-events:none;
-  user-select:none;
-  z-index:9999;
-  font-family:var(--font-sans);
-}
+.watermark{position:fixed;bottom:12px;right:16px;font-size:11px;font-weight:500;color:rgba(78,155,173,.45);letter-spacing:.04em;pointer-events:none;user-select:none;z-index:9999;font-family:var(--font-sans)}
 </style>
 </head>
 <body>
@@ -217,13 +207,12 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo">
-        <!-- AVC wordmark -->
         <div style="margin-bottom:10px">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.18em;color:#4E9BAD;text-transform:uppercase">Antelope Valley College</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.18em;color:#4E9BAD;text-transform:uppercase;text-align:center">Antelope Valley College</div>
           <div style="height:2px;background:linear-gradient(90deg,#4E9BAD,#E8741A,#7A2E43);border-radius:1px;margin-top:3px"></div>
         </div>
-        <div class="login-title" id="loginTitle">Faculty Professional Development Committee</div>
-        <div class="login-sub" id="loginSub">Antelope Valley College</div>
+        <div class="login-title" id="loginTitle" style="text-align:center">Faculty Professional Development Committee</div>
+        <div class="login-sub" id="loginSub" style="text-align:center">Antelope Valley College</div>
       </div>
       <label class="fl">Select your name</label>
       <select id="loginName" style="width:100%;font-size:14px"><option value="">— choose your name —</option></select>
@@ -250,6 +239,10 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="status-pill pill-idle" id="statusPill">Not started</span>
       <span class="live-badge" id="liveBadge" style="display:none"><span class="live-dot"></span>LIVE</span>
+      <!-- Firebase sync status -->
+      <span id="syncStatus" style="font-size:11px;color:#2a6e80;display:flex;align-items:center;gap:3px">
+        <span class="sync-dot" id="syncDot"></span><span id="syncLabel">Connecting…</span>
+      </span>
       <div style="display:flex;align-items:center;gap:5px">
         <div class="avatar av-blue" id="userAvBanner" style="width:26px;height:26px;font-size:10px;font-weight:600"></div>
         <span style="font-size:12px;color:var(--color-text-primary)" id="userNameBanner"></span>
@@ -305,7 +298,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     </div>
     <div class="sec-hd">Agenda (<span id="agCount">0</span> items)</div>
     <div id="agendaList"></div>
-    <div class="next-mtg" id="nextMtgBanner"><i class="ti ti-calendar" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i> Next meeting: <strong>August 26, 2026</strong></div>
+    <div class="next-mtg"><i class="ti ti-calendar" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i> Next meeting: <strong>August 26, 2026</strong></div>
   </div>
 
   <div id="minutesPanel" class="panel">
@@ -314,7 +307,6 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportTxt()"><i class="ti ti-download"></i> Export</button>
         <button class="btn btn-sm btn-success" onclick="saveToArchive()"><i class="ti ti-archive"></i> Save to archive</button>
-        <button class="btn btn-sm" onclick="draftFormal()"><i class="ti ti-file-text"></i> Draft ↗</button>
       </div>
     </div>
     <div class="save-banner" id="saveBanner"><i class="ti ti-circle-check"></i> Saved to Past Minutes.</div>
@@ -341,7 +333,30 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
   </div>
 </div>
 
+<div class="watermark">Created by: Caleb Healey</div>
+
 <script>
+// ═══════════════════════════════════════════════
+//  FIREBASE CONFIG — your project credentials
+// ═══════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyDST_TgO7b0w_A9jRbDpVQCMLjLjOS7Eco",
+  authDomain: "fpd-meeting-portal.firebaseapp.com",
+  databaseURL: "https://fpd-meeting-portal-default-rtdb.firebaseio.com",
+  projectId: "fpd-meeting-portal",
+  storageBucket: "fpd-meeting-portal.firebasestorage.app",
+  messagingSenderId: "535124922202",
+  appId: "1:535124922202:web:324f281a1c301582616d63"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const SYNC_REF = db.ref('fpd_meeting/state');
+const ARCHIVE_REF = db.ref('fpd_meeting/archive');
+
+// ═══════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════
 const PASSWORD='FPD-101';
 const AV=['av-blue','av-teal','av-purple','av-coral','av-amber','av-green','av-gray'];
 const TYPE_LABELS={discussion:'Discussion',action:'Action item',consent:'Consent',public:'Public comment',info:'Informational'};
@@ -377,6 +392,7 @@ const MEMBERS_SEED=[
   {name:'VACANT',role:'Faculty Rep, AKIN',vacant:true},
   {name:'VACANT',role:'ASO Rep',vacant:true}
 ];
+
 const AGENDA_SEED=[
   {title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for the May 27, 2026 meeting.'},
   {title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair Kathy Osburn and Administrative Co-Chair Van Rider.'},
@@ -389,35 +405,82 @@ const AGENDA_SEED=[
   {title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.'}
 ];
 
+// ═══════════════════════════════════════════════
+//  LOCAL STATE (members are always local — seeded)
+// ═══════════════════════════════════════════════
 const S={
-  status:'notstarted',members:[],agenda:[],minutes:[],archive:[],
-  broadcastItem:null,currentUser:null,
+  currentUser:null,
+  members:[],
+  archive:[],
+  // synced via Firebase:
+  status:'notstarted',
+  broadcastItem:null,
+  agenda:[],
+  minutes:[],
   mtg:{name:'Faculty Professional Development Committee',date:'2026-05-27',start:'14:30',end:'16:00',loc:'L201 / Zoom'}
 };
 
-let BC=null;
-try{BC=new BroadcastChannel('fpd_mtg_v5_0527')}catch(e){}
+let _ignoreNextSync=false; // prevent echo
 
-function broadcast(){
-  const p={type:'sync',ts:Date.now(),status:S.status,broadcastItem:S.broadcastItem,mtg:{...S.mtg},
+// ═══════════════════════════════════════════════
+//  FIREBASE SYNC
+// ═══════════════════════════════════════════════
+function pushToFirebase(){
+  _ignoreNextSync=true;
+  const payload={
+    status:S.status,
+    broadcastItem:S.broadcastItem||null,
+    mtg:S.mtg,
     members:S.members.map(m=>({id:m.id,attendance:m.attendance})),
-    agenda:S.agenda.map(a=>({id:a.id,status:a.status,voteOpen:a.voteOpen,motionOpen:a.motionOpen,motioner:a.motioner,seconder:a.seconder,votes:{...a.votes},notes:[...a.notes]})),
-    minutes:S.minutes};
-  if(BC)try{BC.postMessage(p)}catch(e){}
-  try{localStorage.setItem('fpd_sync_v5',JSON.stringify(p))}catch(e){}
+    agenda:S.agenda.map(a=>({
+      id:a.id,status:a.status,voteOpen:a.voteOpen,motionOpen:a.motionOpen,
+      motioner:a.motioner||null,seconder:a.seconder||null,
+      votes:a.votes||{},notes:a.notes||[]
+    })),
+    minutes:S.minutes,
+    ts:Date.now()
+  };
+  SYNC_REF.set(payload).catch(e=>console.error('Firebase write error:',e));
 }
-function applySync(d){
+
+function applyFirebaseData(d){
   if(!d)return;
   if(d.status!==undefined)S.status=d.status;
   if(d.broadcastItem!==undefined)S.broadcastItem=d.broadcastItem;
   if(d.mtg)Object.assign(S.mtg,d.mtg);
   if(d.members)d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm)lm.attendance=dm.attendance});
-  if(d.agenda)d.agenda.forEach(da=>{const la=S.agenda.find(x=>x.id===da.id);if(la){la.status=da.status;la.voteOpen=da.voteOpen;la.motionOpen=da.motionOpen;la.motioner=da.motioner;la.seconder=da.seconder;la.votes=da.votes;la.notes=da.notes}});
+  if(d.agenda)d.agenda.forEach(da=>{
+    const la=S.agenda.find(x=>x.id===da.id);
+    if(la){la.status=da.status;la.voteOpen=!!da.voteOpen;la.motionOpen=!!da.motionOpen;
+      la.motioner=da.motioner||'';la.seconder=da.seconder||'';
+      la.votes=da.votes||{};la.notes=da.notes||[];}
+  });
   if(d.minutes)S.minutes=d.minutes;
 }
-let lastTs=0;
-function pollSync(){try{const raw=localStorage.getItem('fpd_sync_v5');if(!raw)return;const d=JSON.parse(raw);if(d.ts&&d.ts>lastTs){lastTs=d.ts;applySync(d);refreshAll()}}catch(e){}}
 
+// Listen for real-time updates from Firebase
+SYNC_REF.on('value', snapshot=>{
+  const d=snapshot.val();
+  if(!d)return;
+  if(_ignoreNextSync){_ignoreNextSync=false;return;}
+  applyFirebaseData(d);
+  if(S.currentUser)refreshAll();
+},{
+  onlyOnce:false
+});
+
+// Connection state indicator
+db.ref('.info/connected').on('value', snap=>{
+  const connected=snap.val();
+  const dot=document.getElementById('syncDot');
+  const label=document.getElementById('syncLabel');
+  if(dot){dot.className='sync-dot'+(connected?'':' offline');}
+  if(label){label.textContent=connected?'Live sync':'Reconnecting…';}
+});
+
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
 function uid(){return Math.random().toString(36).slice(2,9)}
 function initials(n){if(!n||n==='VACANT')return'—';return String(n).split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -430,45 +493,19 @@ function presentCount(){return S.members.filter(m=>!m.vacant&&isPresent(m)).leng
 function eligibleCount(){return S.members.filter(m=>!m.vacant).length}
 function quorumNeeded(){return Math.floor(eligibleCount()/2)+1}
 function quorumMet(){return presentCount()>=quorumNeeded()}
-
 function fmtMtgSub(){
   const d=new Date(S.mtg.date+'T12:00:00');
   const dateStr=d.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const t=S.mtg.start&&S.mtg.end?S.mtg.start+' – '+S.mtg.end:S.mtg.start||'';
   return dateStr+(t?' · '+t:'')+(S.mtg.loc?' · '+S.mtg.loc:'');
 }
-function updateBannerText(){
-  document.getElementById('bannerName').textContent=S.mtg.name;
-  document.getElementById('bannerSub').textContent=fmtMtgSub();
-  document.getElementById('loginTitle').textContent=S.mtg.name;
-  document.getElementById('loginSub').textContent='Antelope Valley College · '+fmtMtgSub();
-}
-function openSettings(){
-  document.getElementById('set_name').value=S.mtg.name;
-  document.getElementById('set_date').value=S.mtg.date;
-  document.getElementById('set_start').value=S.mtg.start;
-  document.getElementById('set_end').value=S.mtg.end;
-  document.getElementById('set_loc').value=S.mtg.loc;
-  document.getElementById('settingsModal').classList.add('open');
-}
-function closeSettings(){document.getElementById('settingsModal').classList.remove('open')}
-function saveSettings(){
-  S.mtg.name=document.getElementById('set_name').value.trim()||S.mtg.name;
-  S.mtg.date=document.getElementById('set_date').value||S.mtg.date;
-  S.mtg.start=document.getElementById('set_start').value||S.mtg.start;
-  S.mtg.end=document.getElementById('set_end').value||S.mtg.end;
-  S.mtg.loc=document.getElementById('set_loc').value;
-  updateBannerText();broadcast();closeSettings();
-}
-document.getElementById('settingsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSettings()});
-
 function autoFillAbsentVotes(a){
   S.members.filter(m=>!m.vacant).forEach(m=>{
     if(!isPresent(m)){if(!a.votes[m.id]||a.votes[m.id]==='absent')a.votes[m.id]='absent';}
   });
 }
 function voteTotals(a){
-  const vv=Object.values(a.votes);
+  const vv=Object.values(a.votes||{});
   return{yes:vv.filter(v=>v==='yes').length,no:vv.filter(v=>v==='no').length,abs:vv.filter(v=>v==='abstain').length,absent:vv.filter(v=>v==='absent').length};
 }
 function voteResult(a){const{yes,no}=voteTotals(a);if(yes>no)return'passed';if(no>yes)return'failed';return'tied'}
@@ -495,32 +532,40 @@ function autoCloseVoting(a){
   }
   a.status='complete';
 }
+function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
 
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
 function init(){
   MEMBERS_SEED.forEach((m,i)=>S.members.push({id:uid(),name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
   AGENDA_SEED.forEach(a=>S.agenda.push({id:uid(),title:a.title,type:a.type,desc:a.desc,status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''}));
-  try{const saved=localStorage.getItem('fpd_archive_v5');if(saved)S.archive=JSON.parse(saved)}catch(e){}
-  try{const raw=localStorage.getItem('fpd_sync_v5');if(raw){const d=JSON.parse(raw);if(d.ts&&Date.now()-d.ts<7200000){applySync(d);lastTs=d.ts}}}catch(e){}
+  // Load archive from Firebase
+  ARCHIVE_REF.once('value').then(snap=>{const d=snap.val();if(d)S.archive=Object.values(d);renderPastMinutes();});
   buildLoginDropdown();updateBannerText();
-  if(BC)BC.onmessage=e=>{if(e.data&&e.data.type==='sync'&&e.data.ts>lastTs){lastTs=e.data.ts;applySync(e.data);refreshAll()}};
-  setInterval(pollSync,2000);
 }
 init();
 
-function refreshAll(){updateBannerText();updateBanner();renderNow();renderRoster();renderAgenda();renderMinutes()}
+function refreshAll(){updateBannerText();updateBanner();renderNow();renderRoster();renderAgenda();renderMinutes();}
 function buildLoginDropdown(){
   const sel=document.getElementById('loginName');
   sel.innerHTML='<option value="">— choose your name —</option>';
   S.members.filter(m=>!m.vacant).forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name+' · '+m.role;sel.appendChild(o)});
 }
+
+// ═══════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════
 function doLogin(){
   const mid=document.getElementById('loginName').value,pass=document.getElementById('loginPass').value;
   if(!mid){showErr('Please select your name.');return}
   if(pass!==PASSWORD){showErr('Incorrect password.');return}
   const m=S.members.find(x=>x.id===mid);if(!m){showErr('Not found.');return}
   document.getElementById('loginErr').style.display='none';
-  S.currentUser=m;if(m.attendance!=='app')m.attendance='app';
-  broadcast();enterApp();
+  S.currentUser=m;
+  if(m.attendance!=='app')m.attendance='app';
+  pushToFirebase();
+  enterApp();
 }
 function showErr(msg){const e=document.getElementById('loginErr');e.textContent=msg;e.style.display='block'}
 function doLogout(){
@@ -544,6 +589,34 @@ function enterApp(){
   document.getElementById('adjournBtn').style.display=admin&&S.status==='inprogress'?'inline-flex':'none';
   refreshAll();showPanel('nowPanel',document.getElementById('tabNow'));
 }
+
+// ═══════════════════════════════════════════════
+//  MEETING SETTINGS
+// ═══════════════════════════════════════════════
+function updateBannerText(){
+  document.getElementById('bannerName').textContent=S.mtg.name;
+  document.getElementById('bannerSub').textContent=fmtMtgSub();
+  document.getElementById('loginTitle').textContent=S.mtg.name;
+  document.getElementById('loginSub').textContent='Antelope Valley College · '+fmtMtgSub();
+}
+function openSettings(){
+  document.getElementById('set_name').value=S.mtg.name;
+  document.getElementById('set_date').value=S.mtg.date;
+  document.getElementById('set_start').value=S.mtg.start;
+  document.getElementById('set_end').value=S.mtg.end;
+  document.getElementById('set_loc').value=S.mtg.loc;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){document.getElementById('settingsModal').classList.remove('open')}
+function saveSettings(){
+  S.mtg.name=document.getElementById('set_name').value.trim()||S.mtg.name;
+  S.mtg.date=document.getElementById('set_date').value||S.mtg.date;
+  S.mtg.start=document.getElementById('set_start').value||S.mtg.start;
+  S.mtg.end=document.getElementById('set_end').value||S.mtg.end;
+  S.mtg.loc=document.getElementById('set_loc').value;
+  updateBannerText();pushToFirebase();closeSettings();
+}
+document.getElementById('settingsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSettings()});
 function updateBanner(){
   const cfg={notstarted:['dot-idle','pill-idle','Not started'],inprogress:['dot-live','pill-live','In progress'],adjourned:['dot-adj','pill-adj','Adjourned']};
   const[dc,pc,label]=cfg[S.status]||cfg.notstarted;
@@ -556,21 +629,29 @@ function updateBanner(){
     document.getElementById('adjournBtn').style.display=S.status==='inprogress'?'inline-flex':'none';
   }
 }
+
+// ═══════════════════════════════════════════════
+//  MEETING CONTROL
+// ═══════════════════════════════════════════════
 function callToOrder(){
   if(!isAdmin())return;
   if(!quorumMet()){if(!confirm('Quorum not yet met ('+presentCount()+' of '+quorumNeeded()+' needed).\nProceed anyway?'))return}
   S.status='inprogress';
   const names=S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>m.role+' '+m.name).join(', ')||'(none yet)';
   addMinute(S.mtg.name+' called to order. '+fmtMtgSub()+'. Members present: '+names+'.','decision');
-  broadcast();updateBanner();renderRoster();renderMinutes();renderNow();
+  pushToFirebase();updateBanner();renderRoster();renderMinutes();renderNow();
 }
 function adjourn(){
   if(!isAdmin())return;
   S.status='adjourned';S.broadcastItem=null;
   addMinute('Meeting adjourned. Next meeting: August 26, 2026.','decision');
   S.agenda.filter(a=>a.voteOpen||a.motionOpen).forEach(a=>{a.voteOpen=false;a.motionOpen=false});
-  broadcast();updateBanner();renderRoster();renderMinutes();renderNow();
+  pushToFirebase();updateBanner();renderRoster();renderMinutes();renderNow();
 }
+
+// ═══════════════════════════════════════════════
+//  ROSTER
+// ═══════════════════════════════════════════════
 function addMember(){
   if(!isAdmin())return;
   const name=document.getElementById('mName').value.trim(),role=document.getElementById('mRole').value.trim()||'Member';
@@ -590,7 +671,7 @@ function chairToggleAttendance(id){
   if(m.attendance==='app'){if(!confirm(m.name+' signed in via the app. Mark absent anyway?'))return;m.attendance=false;}
   else if(m.attendance==='override'){m.attendance=false;}
   else{m.attendance='override';}
-  broadcast();renderRoster();renderNow();
+  pushToFirebase();renderRoster();renderNow();
 }
 function renderRoster(){
   const el=document.getElementById('memberList');
@@ -609,12 +690,16 @@ function renderRoster(){
     else{attBadge='<span class="att-badge att-absent-b">Absent</span>';if(isAdmin())attBtn=`<button class="btn btn-xs btn-success" style="margin-left:5px;font-size:11px" onclick="chairToggleAttendance('${m.id}')"><i class="ti ti-user-check"></i> Mark present</button>`;}
     return`<div class="member-card ${m.vacant?'vacant-card':''}">
       <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
-      <div class="member-info"><div class="member-name">${esc(m.name)}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:var(--color-text-info)">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
+      <div class="member-info"><div class="member-name">${esc(m.name)}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
       <div style="display:flex;align-items:center">${attBadge}${attBtn}</div>
       ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
     </div>`;
   }).join('');
 }
+
+// ═══════════════════════════════════════════════
+//  AGENDA
+// ═══════════════════════════════════════════════
 function showPanel(id,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
@@ -626,17 +711,18 @@ function addAgendaItem(){
   if(!isAdmin())return;
   const title=document.getElementById('agTitle').value.trim();if(!title)return;
   S.agenda.push({id:uid(),title,type:document.getElementById('agType').value,desc:document.getElementById('agDesc').value.trim(),status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''});
-  document.getElementById('agTitle').value='';document.getElementById('agDesc').value='';renderAgenda();
+  document.getElementById('agTitle').value='';document.getElementById('agDesc').value='';
+  pushToFirebase();renderAgenda();
 }
 function removeAgendaItem(id){
   if(!isAdmin()||!confirm('Remove this item?'))return;
   if(S.broadcastItem===id)S.broadcastItem=null;
-  S.agenda=S.agenda.filter(a=>a.id!==id);broadcast();renderAgenda();renderNow();
+  S.agenda=S.agenda.filter(a=>a.id!==id);pushToFirebase();renderAgenda();renderNow();
 }
 function moveItem(id,dir){
   const i=S.agenda.findIndex(x=>x.id===id),j=i+dir;
   if(j<0||j>=S.agenda.length)return;
-  [S.agenda[i],S.agenda[j]]=[S.agenda[j],S.agenda[i]];renderAgenda();
+  [S.agenda[i],S.agenda[j]]=[S.agenda[j],S.agenda[i]];pushToFirebase();renderAgenda();
 }
 function renderAgenda(){
   const el=document.getElementById('agendaList');
@@ -663,7 +749,11 @@ function renderAgenda(){
     </div>`).join('');
 }
 function toggleAg(bid,hdr){const b=document.getElementById(bid),c=hdr.querySelector('.chevron');const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
-function goLive(id){S.broadcastItem=id;broadcast();renderNow();renderAgenda()}
+function goLive(id){S.broadcastItem=id;pushToFirebase();renderNow();renderAgenda()}
+
+// ═══════════════════════════════════════════════
+//  AGENDA NAV
+// ═══════════════════════════════════════════════
 function buildAgendaNav(currentId){
   return`<div class="ag-nav-wrap">${S.agenda.map((ag,i)=>{
     const isCurrent=ag.id===currentId,isDone=ag.status==='complete'&&!isCurrent;
@@ -675,6 +765,10 @@ function buildAgendaNav(currentId){
     </button>`;
   }).join('')}</div>`;
 }
+
+// ═══════════════════════════════════════════════
+//  NOW PANEL
+// ═══════════════════════════════════════════════
 function renderNow(){
   const el=document.getElementById('nowContent');
   if(!S.currentUser){el.innerHTML='';return}
@@ -731,7 +825,7 @@ function renderNow(){
         <button class="motion-btn ${isSeconder?'sel-second':''} ${!canSecond&&!isSeconder?'taken':''}" onclick="selfSelectMotion('${a.id}','second')" ${!canSecond&&!isSeconder?'disabled':''}>${isSeconder?'✓ I seconded this':'I second this motion'}</button>
       </div>
     </div>`+(a.voteOpen?`<div><div class="sec-hd">Cast your vote</div>
-      ${myV&&myV!=='absent'?`<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;color:var(--color-text-secondary)">Your vote:</span><span class="vote-chip ${VOTE_CHIP_CLS[myV]}" style="font-size:13px;padding:4px 14px">${VOTE_LABELS[myV]}</span></div>`:`<div style="font-size:12px;color:#7a4e06;background:#fef0d4;border:0.5px solid #d4860a;padding:6px 12px;border-radius:var(--border-radius-md);margin-bottom:12px">Cast your vote below.</div>`}
+      ${myV&&myV!=='absent'?`<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;color:var(--color-text-secondary)">Your vote:</span><span class="vote-chip ${VOTE_CHIP_CLS[myV]}" style="font-size:13px;padding:4px 14px">${VOTE_LABELS[myV]}</span></div>`:`<div style="font-size:12px;color:#7a3e08;background:#fdf0e6;border:0.5px solid #E8741A;padding:6px 12px;border-radius:var(--border-radius-md);margin-bottom:12px">Cast your vote below.</div>`}
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="mvc-vb mvc-vb-yes ${myV==='yes'?'selected':''}" onclick="memberVote('${a.id}','yes')">✓ Yes</button>
         <button class="mvc-vb mvc-vb-no ${myV==='no'?'selected':''}" onclick="memberVote('${a.id}','no')">✗ No</button>
@@ -741,7 +835,7 @@ function renderNow(){
   }
   let chairPanel='';
   if(isAdmin()){
-    const notesHtml=a.notes.length?a.notes.map((n,ni)=>`<div class="minute-entry"><div class="me-dot me-${n.type}"></div><div style="flex:1"><div class="me-text">${esc(n.text)}</div><div class="me-ts">${n.ts}</div></div><span style="cursor:pointer;color:var(--color-text-secondary);font-size:16px;line-height:1" onclick="removeNote('${a.id}',${ni})">×</span></div>`).join(''):'<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">No notes yet.</div>';
+    const notesHtml=a.notes&&a.notes.length?a.notes.map((n,ni)=>`<div class="minute-entry"><div class="me-dot me-${n.type}"></div><div style="flex:1"><div class="me-text">${esc(n.text)}</div><div class="me-ts">${n.ts}</div></div><span style="cursor:pointer;color:var(--color-text-secondary);font-size:16px;line-height:1" onclick="removeNote('${a.id}',${ni})">×</span></div>`).join(''):'<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">No notes yet.</div>';
     const moverM2=S.members.find(m=>m.id===a.motioner);
     const secondM2=S.members.find(m=>m.id===a.seconder);
     const rollRows=present.length?present.map(m=>{
@@ -799,10 +893,14 @@ function renderNow(){
     </div>
   </div>${chairPanel}`;
 }
-function toggleMotionOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.motionOpen=!a.motionOpen;if(a.motionOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Motion period '+(a.motionOpen?'opened.':'closed.'),'note');broadcast();renderNow();renderAgenda()}
-function toggleVoteOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.voteOpen=!a.voteOpen;if(a.voteOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Voting '+(a.voteOpen?'opened.':'closed.'),'note');broadcast();renderNow();renderAgenda()}
-function setMotioner(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.motioner=mid;broadcast();renderNow()}
-function setSeconder(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.seconder=mid;broadcast();renderNow()}
+
+// ═══════════════════════════════════════════════
+//  VOTE & MOTION ACTIONS
+// ═══════════════════════════════════════════════
+function toggleMotionOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.motionOpen=!a.motionOpen;if(a.motionOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Motion period '+(a.motionOpen?'opened.':'closed.'),'note');pushToFirebase();renderNow();renderAgenda()}
+function toggleVoteOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.voteOpen=!a.voteOpen;if(a.voteOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Voting '+(a.voteOpen?'opened.':'closed.'),'note');pushToFirebase();renderNow();renderAgenda()}
+function setMotioner(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.motioner=mid;pushToFirebase();renderNow()}
+function setSeconder(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.seconder=mid;pushToFirebase();renderNow()}
 function selfSelectMotion(aid,role){
   const a=S.agenda.find(x=>x.id===aid);if(!a||!S.currentUser)return;
   const mid=S.currentUser.id;
@@ -812,45 +910,52 @@ function selfSelectMotion(aid,role){
     addMinute('['+a.title+'] Motion moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Voting closed automatically.','note');
     autoCloseVoting(a);
   }
-  broadcast();renderNow();renderAgenda();renderMinutes();
+  pushToFirebase();renderNow();renderAgenda();renderMinutes();
 }
 function memberVote(aid,choice){
   if(!S.currentUser)return;
   const a=S.agenda.find(x=>x.id===aid);if(!a||!a.voteOpen)return;
   a.votes[S.currentUser.id]=a.votes[S.currentUser.id]===choice?null:choice;
-  broadcast();renderNow();
+  pushToFirebase();renderNow();
 }
-function adminVote(aid,mid,choice){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.votes[mid]=choice;broadcast();renderNow()}
+function adminVote(aid,mid,choice){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.votes[mid]=choice;pushToFirebase();renderNow()}
 function clearVote(aid,mid){
   const a=S.agenda.find(x=>x.id===aid);if(!a)return;
   const m=S.members.find(x=>x.id===mid);
-  a.votes[mid]=m&&!isPresent(m)?'absent':null;broadcast();renderNow();
+  a.votes[mid]=m&&!isPresent(m)?'absent':null;pushToFirebase();renderNow();
 }
 function markItemDone(id){
   const a=S.agenda.find(x=>x.id===id);if(!a)return;
-  if(a.status==='complete'){a.status='active';broadcast();renderAgenda();renderNow();return}
-  autoCloseVoting(a);broadcast();renderAgenda();renderMinutes();renderNow();
+  if(a.status==='complete'){a.status='active';pushToFirebase();renderAgenda();renderNow();return}
+  autoCloseVoting(a);pushToFirebase();renderAgenda();renderMinutes();renderNow();
 }
 function addNote(id){
   const a=S.agenda.find(x=>x.id===id);if(!a)return;
   const inp=document.getElementById('noteInp_'+id);if(!inp)return;
   const txt=inp.value.trim();if(!txt)return;
   const type=(document.getElementById('noteType_'+id)||{}).value||'note';
+  if(!a.notes)a.notes=[];
   a.notes.push({text:txt,type,ts:ts()});inp.value='';
-  addMinute('['+a.title+'] '+txt,type);broadcast();renderNow();renderMinutes();
+  addMinute('['+a.title+'] '+txt,type);pushToFirebase();renderNow();renderMinutes();
 }
-function removeNote(aid,idx){const a=S.agenda.find(x=>x.id===aid);if(a){a.notes.splice(idx,1);broadcast();renderNow()}}
-function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
+function removeNote(aid,idx){const a=S.agenda.find(x=>x.id===aid);if(a&&a.notes){a.notes.splice(idx,1);pushToFirebase();renderNow()}}
+
+// ═══════════════════════════════════════════════
+//  MINUTES
+// ═══════════════════════════════════════════════
 function renderMinutes(){
   const el=document.getElementById('minutesList');
   if(!S.minutes.length){el.innerHTML='<div class="empty">Minutes appear here as the meeting progresses.</div>';return}
   const dotMap={note:'me-note',motion:'me-motion',decision:'me-decision',action:'me-action'};
   el.innerHTML=S.minutes.map(m=>`<div class="minute-entry"><div class="me-dot ${dotMap[m.type]||'me-note'}"></div><div style="flex:1"><div class="me-text">${esc(m.text)}</div><div class="me-ts">${m.ts}</div></div></div>`).join('');
 }
+
+// ═══════════════════════════════════════════════
+//  ARCHIVE
+// ═══════════════════════════════════════════════
 function buildReport(){
-  const sub=fmtMtgSub();
   const lines=['═══════════════════════════════════════════════════════',
-    '  '+S.mtg.name.toUpperCase(),'  ANTELOPE VALLEY COLLEGE — MINUTES & VOTE REPORT','  '+sub,
+    '  '+S.mtg.name.toUpperCase(),'  ANTELOPE VALLEY COLLEGE — MINUTES & VOTE REPORT','  '+fmtMtgSub(),
     '═══════════════════════════════════════════════════════','',
     'PRESENT:',...S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>'  '+padR(m.role,34)+m.name+(m.attendance==='override'?' [manual]':'')),
     '','ABSENT:',...S.members.filter(m=>!m.vacant&&!isPresent(m)).map(m=>'  '+padR(m.role,34)+m.name),
@@ -860,7 +965,6 @@ function buildReport(){
   const voted=S.agenda.filter(a=>a.type==='action'||a.type==='consent');
   if(voted.length){lines.push('VOTE DETAIL','');voted.forEach(a=>{
     autoFillAbsentVotes(a);
-    const present=S.members.filter(m=>!m.vacant&&isPresent(m));
     const mover=S.members.find(m=>m.id===a.motioner),second=S.members.find(m=>m.id===a.seconder);
     const{yes,no,abs,absent}=voteTotals(a);
     const res=a.status==='complete'?(yes>no?'PASSED':no>yes?'FAILED':'FAILED (TIED)'):'PENDING';
@@ -875,11 +979,14 @@ function saveToArchive(){
   const text=buildReport();
   const d=new Date(S.mtg.date+'T12:00:00');
   const label=d.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})+' — '+S.mtg.name;
-  const idx=S.archive.findIndex(a=>a.label===label);
-  const entry={id:uid(),label,date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
-  if(idx>=0){if(!confirm('Overwrite existing record?'))return;S.archive[idx]=entry;}else S.archive.unshift(entry);
-  try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}
-  renderPastMinutes();const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),3000);
+  const entryId='archive_'+S.mtg.date.replace(/-/g,'');
+  const entry={id:entryId,label,date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
+  ARCHIVE_REF.child(entryId).set(entry).then(()=>{
+    const idx=S.archive.findIndex(a=>a.id===entryId);
+    if(idx>=0)S.archive[idx]=entry;else S.archive.unshift(entry);
+    renderPastMinutes();
+    const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),3000);
+  });
 }
 function uploadMinutes(e){
   const f=e.target.files[0];if(!f)return;
@@ -887,13 +994,21 @@ function uploadMinutes(e){
     const text=ev.target.result;
     const m=text.split('\n').slice(0,6).join(' ').match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}/i);
     const dateStr=m?m[0]:'Unknown date';
-    S.archive.unshift({id:uid(),label:dateStr+' — FPD Committee',date:dateStr,savedAt:new Date().toLocaleString(),text,uploaded:true});
-    try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}
-    renderPastMinutes();e.target.value='';
+    const entryId='archive_upload_'+uid();
+    const entry={id:entryId,label:dateStr+' — FPD Committee',date:dateStr,savedAt:new Date().toLocaleString(),text,uploaded:true};
+    ARCHIVE_REF.child(entryId).set(entry).then(()=>{S.archive.unshift(entry);renderPastMinutes();});
+    e.target.value='';
   };r.readAsText(f);
 }
-function clearArchive(){if(!confirm('Clear all past minutes?'))return;S.archive=[];try{localStorage.removeItem('fpd_archive_v5')}catch(e){}renderPastMinutes()}
-function deleteArchiveItem(){const id=document.getElementById('archiveSelect').value;if(!id)return;if(!confirm('Delete?'))return;S.archive=S.archive.filter(a=>a.id!==id);try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}renderPastMinutes()}
+function clearArchive(){
+  if(!confirm('Clear all past minutes?'))return;
+  ARCHIVE_REF.remove().then(()=>{S.archive=[];renderPastMinutes();});
+}
+function deleteArchiveItem(){
+  const id=document.getElementById('archiveSelect').value;if(!id)return;
+  if(!confirm('Delete?'))return;
+  ARCHIVE_REF.child(id).remove().then(()=>{S.archive=S.archive.filter(a=>a.id!==id);renderPastMinutes();});
+}
 function viewArchiveItem(){
   const id=document.getElementById('archiveSelect').value;
   document.getElementById('deleteArchiveBtn').style.display=id?'inline-flex':'none';
@@ -925,15 +1040,9 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,50)+'.txt',a.text)}
-function deleteOne(id){if(!confirm('Delete?'))return;S.archive=S.archive.filter(a=>a.id!==id);try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}renderPastMinutes()}
+function deleteOne(id){if(!confirm('Delete?'))return;ARCHIVE_REF.child(id).remove().then(()=>{S.archive=S.archive.filter(a=>a.id!==id);renderPastMinutes();})}
 function exportTxt(){dl((S.mtg.name+'_'+S.mtg.date).replace(/[^a-z0-9]/gi,'_')+'.txt',buildReport())}
 function dl(name,text){const blob=new Blob([text],{type:'text/plain'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click()}
-function draftFormal(){
-  const present=S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>m.role+' '+m.name).join(', ');
-  alert('Copy this prompt into Claude:\n\nDraft formal meeting minutes for '+S.mtg.name+', Antelope Valley College. Date: '+fmtMtgSub()+'. Members present: '+present+'. Record: '+S.minutes.map(m=>m.text).join(' | ')+'. Next meeting: August 26, 2026.');
-}
 </script>
-
-<div class="watermark">Created by: Caleb Healey</div>
 </body>
 </html>
