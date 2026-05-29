@@ -398,6 +398,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="document.getElementById('uploadFile').click()"><i class="ti ti-upload"></i> Upload (.txt)</button>
         <input type="file" id="uploadFile" accept=".txt,.md" style="display:none" onchange="uploadMinutes(event)">
+<input type="file" id="agendaFileInput" style="display:none" onchange="handleAgendaFileUpload(event)">
         <button class="btn btn-sm" id="clearArchiveBtn" style="display:none;color:var(--color-text-danger)" onclick="clearArchive()"><i class="ti ti-trash"></i> Clear all</button>
       </div>
     </div>
@@ -522,17 +523,20 @@ const S={
 };
 
 let _ignoreNextSync=false;
+const _DEVICE_ID='dev_'+Math.random().toString(36).slice(2,10);
+let _lastPushId=null;
 
 // ── Firebase sync ──
 function pushToFirebase(){
   if(!_fbAvailable||!SYNC_REF)return;
   _ignoreNextSync=true;
+  _lastPushId=_DEVICE_ID+'_'+Date.now();
   const payload={
     status:S.status,broadcastItem:S.broadcastItem||null,mtg:S.mtg,
     members:S.members.map(m=>({id:m.id,attendance:m.attendance})),
     agenda:S.agenda.map(a=>({id:a.id,status:a.status,voteOpen:!!a.voteOpen,motionOpen:!!a.motionOpen,
-      motioner:a.motioner||null,seconder:a.seconder||null,votes:a.votes||{},notes:a.notes||[]})),
-    minutes:S.minutes,ts:Date.now()
+      motioner:a.motioner||null,seconder:a.seconder||null,votes:a.votes||{},notes:a.notes||[],attachments:a.attachments||[]})),
+    minutes:S.minutes,ts:Date.now(),pushedBy:_lastPushId
   };
   SYNC_REF.set(payload).catch(e=>console.error('FB write:',e));
 }
@@ -545,11 +549,11 @@ function applyFirebaseData(d){
   if(d.agenda)d.agenda.forEach(da=>{
     const la=S.agenda.find(x=>x.id===da.id);
     if(la){la.status=da.status;la.voteOpen=!!da.voteOpen;la.motionOpen=!!da.motionOpen;
-      la.motioner=da.motioner||'';la.seconder=da.seconder||'';la.votes=da.votes||{};la.notes=da.notes||[];}
+      la.motioner=da.motioner||'';la.seconder=da.seconder||'';la.votes=da.votes||{};la.notes=da.notes||[];la.attachments=da.attachments||[];}
     else{// new item added during meeting — add to local agenda
       S.agenda.push({id:da.id,title:da.title||'',type:da.type||'discussion',desc:da.desc||'',
         status:da.status,voteOpen:!!da.voteOpen,motionOpen:!!da.motionOpen,
-        motioner:da.motioner||'',seconder:da.seconder||'',votes:da.votes||{},notes:da.notes||[]});}
+        motioner:da.motioner||'',seconder:da.seconder||'',votes:da.votes||{},notes:da.notes||[],attachments:da.attachments||[]});}
   });
   if(d.minutes)S.minutes=d.minutes;
 }
@@ -557,6 +561,8 @@ function applyFirebaseData(d){
 if(_fbAvailable){
   SYNC_REF.on('value',snap=>{
     const d=snap.val();if(!d)return;
+    // Skip ALL callbacks from our own device — we already have the data locally
+    if(d.pushedBy&&d.pushedBy.startsWith(_DEVICE_ID)){return;}
     if(_ignoreNextSync){_ignoreNextSync=false;return;}
     applyFirebaseData(d);
     if(S.currentUser)refreshAll();
@@ -704,14 +710,14 @@ function init(){
 function seedAgenda(lastMeetingDate){
   const lastLabel=fmtDateShort(lastMeetingDate);
   S.agenda=[
-    {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a04',title:'Approval of Previous Minutes — '+lastLabel,type:'action',desc:'Motion to approve the minutes from the '+lastLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a05',title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a06',title:'FEP Reports — Vote',type:'action',desc:'Action item: FEP Reports. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a07',title:'FPD Credit for Scholarship Review for our Foundation',type:'action',desc:'Action item: FPD Credit for Scholarship Review. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a08',title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
+    {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a04',title:'Approval of Previous Minutes — '+lastLabel,type:'action',desc:'Motion to approve the minutes from the '+lastLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a05',title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a06',title:'FEP Reports — Vote',type:'action',desc:'Action item: FEP Reports. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a07',title:'FPD Credit for Scholarship Review for our Foundation',type:'action',desc:'Action item: FPD Credit for Scholarship Review. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a08',title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
   ];
 }
 init();
@@ -1105,7 +1111,7 @@ function showPanel(id,el){
 function addAgendaItem(){
   if(!isAdmin())return;
   const title=document.getElementById('agTitle').value.trim();if(!title)return;
-  const newItem={id:'ag_'+uid(),title,type:document.getElementById('agType').value,desc:document.getElementById('agDesc').value.trim(),status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''};
+  const newItem={id:'ag_'+uid(),title,type:document.getElementById('agType').value,desc:document.getElementById('agDesc').value.trim(),status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]};
   S.agenda.push(newItem);
   document.getElementById('agTitle').value='';document.getElementById('agDesc').value='';
   pushToFirebase();renderAgenda();
@@ -1138,10 +1144,12 @@ function renderAgenda(){
         ${a.desc?`<p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;line-height:1.5;background:var(--color-background-secondary);padding:8px 12px;border-radius:var(--border-radius-md)">${esc(a.desc)}</p>`:''}
         ${a.carried?'<p style="font-size:12px;color:#944d0e;background:#fdf0e6;padding:5px 10px;border-radius:var(--border-radius-md);margin-bottom:8px"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Carried forward from previous meeting</p>':''}
         ${isAdmin()&&a.notes&&a.notes.length?`<div style="margin-bottom:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:8px"><div class="sec-hd" style="margin-bottom:6px">Minutes</div>${a.notes.map(n=>'<div class="minute-entry" style="padding:4px 0"><div class="me-dot me-'+n.type+'"></div><div style="flex:1"><div class="me-text">'+esc(n.text)+'</div><div class="me-ts">'+n.ts+'</div></div></div>').join('')}</div>`:''}
+        ${a.attachments&&a.attachments.length?`<div style="margin-bottom:8px">${a.attachments.map((f,fi)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:4px;font-size:12px"><i class="ti ti-file" style="color:#2a6e80;font-size:13px"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--color-text-secondary);font-size:11px">${(f.size/1024).toFixed(0)}KB</span><button class="btn btn-xs" onclick="downloadAttachment('${a.id}',${fi})"><i class="ti ti-download" style="font-size:11px"></i></button>${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="removeAttachment('${a.id}',${fi})"><i class="ti ti-trash" style="font-size:11px"></i></button>`:''}</div>`).join('')}</div>`:''}
         ${isAdmin()?`<div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-xs" onclick="moveItem('${a.id}',-1)"><i class="ti ti-arrow-up"></i></button>
           <button class="btn btn-xs" onclick="moveItem('${a.id}',1)"><i class="ti ti-arrow-down"></i></button>
           <button class="btn btn-xs btn-success" onclick="goLive('${a.id}');showPanel('nowPanel',document.getElementById('tabNow'))"><i class="ti ti-radio"></i> Go live</button>
+          <button class="btn btn-xs btn-primary" onclick="triggerAgendaFileUpload('${a.id}')"><i class="ti ti-paperclip"></i> Attach</button>
           <button class="btn btn-xs btn-danger" onclick="removeAgendaItem('${a.id}')"><i class="ti ti-trash"></i></button>
         </div>`:''}
       </div>
@@ -1332,6 +1340,7 @@ function renderNow(){
       ${a.desc?`<div class="ci-desc">${esc(a.desc)}</div>`:''}
       <span class="type-badge ${TYPE_BADGE[a.type]}">${TYPE_LABELS[a.type]}</span>
       ${a.status==='complete'?'<span class="ag-status as-complete" style="margin-left:6px">Complete</span>':a.voteOpen?'<span class="ag-status as-voting" style="margin-left:6px">Voting open</span>':a.motionOpen?'<span class="ag-status as-motion" style="margin-left:6px">Motion open</span>':''}
+      ${a.attachments&&a.attachments.length?`<div style="margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px"><div class="sec-hd" style="margin-bottom:6px"><i class="ti ti-paperclip" style="font-size:11px"></i> Documents</div>${a.attachments.map((f,fi)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:4px;font-size:12px"><i class="ti ti-file" style="color:#2a6e80;font-size:13px"></i><span style="flex:1">${esc(f.name)}</span><button class="btn btn-xs" onclick="downloadAttachment('${a.id}',${fi})"><i class="ti ti-download" style="font-size:11px"></i> Download</button></div>`).join('')}</div>`:''}
       ${memberActions}
     </div>
   </div>${chairPanel}`;
@@ -1349,16 +1358,16 @@ function advanceToNextMeeting(){
   // carry forward any incomplete non-standard items
   const carryItems=S.agenda
     .filter(a=>!standardIds.includes(a.id)&&a.status!=='complete')
-    .map(a=>({...a,id:'co_'+uid(),status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[],carried:true}));
+    .map(a=>({...a,id:'co_'+uid(),status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[],attachments:[],carried:true}));
   // grab any pre-set future agenda items for this next meeting date
   const futureItems=(S.futureAgendas[next.date]?Object.values(S.futureAgendas[next.date]):[])
     .sort((a,b)=>(a.order||0)-(b.order||0))
     .map(a=>({...a,status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[]}));
   const newAgenda=[
-    {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a04',title:'Approval of Previous Minutes — '+prevLabel,type:'action',desc:'Motion to approve the minutes from the '+prevLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
+    {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
+    {id:'a04',title:'Approval of Previous Minutes — '+prevLabel,type:'action',desc:'Motion to approve the minutes from the '+prevLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
     ...carryItems,...futureItems
   ];
   S.mtg={name:S.mtg.name,date:next.date,start:next.start||S.mtg.start,end:next.end||S.mtg.end,loc:next.loc||S.mtg.loc};
@@ -1450,6 +1459,41 @@ function moveFutureItem(dateKey,id,dir){
   updates[items[idx].id+'/order']=swapIdx;
   updates[items[swapIdx].id+'/order']=idx;
   if(_fbAvailable)FUTURE_REF.child(dateKey).update(updates);
+}
+
+
+// ── Document Attachments ──
+let _attachTargetId = null;
+function triggerAgendaFileUpload(agendaId){
+  _attachTargetId = agendaId;
+  const inp = document.getElementById('agendaFileInput');
+  inp.value='';inp.click();
+}
+function handleAgendaFileUpload(e){
+  const f = e.target.files[0]; if(!f||!_attachTargetId)return;
+  const a = S.agenda.find(x=>x.id===_attachTargetId); if(!a)return;
+  if(f.size > 3*1024*1024){alert('File is too large. Please keep attachments under 3MB.');return;}
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if(!a.attachments)a.attachments=[];
+    a.attachments.push({name:f.name,size:f.size,type:f.type,data:ev.target.result,uploadedAt:new Date().toLocaleString()});
+    pushToFirebase();renderAgenda();renderNow();
+  };
+  reader.readAsDataURL(f);
+}
+function downloadAttachment(agendaId, idx){
+  const a = S.agenda.find(x=>x.id===agendaId); if(!a||!a.attachments)return;
+  const f = a.attachments[idx]; if(!f)return;
+  const link = document.createElement('a');
+  link.href = f.data;
+  link.download = f.name;
+  link.click();
+}
+function removeAttachment(agendaId, idx){
+  if(!isAdmin()||!confirm('Remove this attachment?'))return;
+  const a = S.agenda.find(x=>x.id===agendaId); if(!a||!a.attachments)return;
+  a.attachments.splice(idx,1);
+  pushToFirebase();renderAgenda();renderNow();
 }
 
 // ── Vote actions ──
