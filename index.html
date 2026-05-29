@@ -321,7 +321,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div class="nav-tab" onclick="showPanel('rosterPanel',this)"><i class="ti ti-users"></i> Roster</div>
     <div class="nav-tab" onclick="showPanel('agendaPanel',this)"><i class="ti ti-list"></i> Agenda</div>
     <div class="nav-tab" id="minutesTab" style="display:none" onclick="showPanel('minutesPanel',this)"><i class="ti ti-notes"></i> Minutes</div>
-    <div class="nav-tab" id="calendarTab" style="display:none" onclick="showPanel('calendarPanel',this)" id="calTab"><i class="ti ti-calendar"></i> Calendar</div>
+    <div class="nav-tab" id="calendarTab" style="display:none" onclick="showPanel('calendarPanel',this)"><i class="ti ti-calendar"></i> Calendar</div>
     <div class="nav-tab" onclick="showPanel('pastPanel',this)"><i class="ti ti-archive"></i> Past</div>
   </div>
 
@@ -443,23 +443,30 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 <div class="watermark">Created by: Caleb Healey</div>
 
 <script>
-// ── Firebase ──
-const firebaseConfig={
-  apiKey:"AIzaSyDST_TgO7b0w_A9jRbDpVQCMLjLjOS7Eco",
-  authDomain:"fpd-meeting-portal.firebaseapp.com",
-  databaseURL:"https://fpd-meeting-portal-default-rtdb.firebaseio.com",
-  projectId:"fpd-meeting-portal",
-  storageBucket:"fpd-meeting-portal.firebasestorage.app",
-  messagingSenderId:"535124922202",
-  appId:"1:535124922202:web:324f281a1c301582616d63"
-};
-firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
-const SYNC_REF=db.ref('fpd_meeting/state');
-const ARCHIVE_REF=db.ref('fpd_meeting/archive');
-const NOTIF_REF=db.ref('fpd_meeting/notification');
-const CALENDAR_REF=db.ref('fpd_meeting/calendar');
-const FUTURE_REF=db.ref('fpd_meeting/future_agendas');
+// ── Firebase (graceful fallback if SDK unavailable) ──
+let db=null,SYNC_REF=null,ARCHIVE_REF=null,NOTIF_REF=null,CALENDAR_REF=null,FUTURE_REF=null;
+let _fbAvailable=false;
+try{
+  const firebaseConfig={
+    apiKey:"AIzaSyDST_TgO7b0w_A9jRbDpVQCMLjLjOS7Eco",
+    authDomain:"fpd-meeting-portal.firebaseapp.com",
+    databaseURL:"https://fpd-meeting-portal-default-rtdb.firebaseio.com",
+    projectId:"fpd-meeting-portal",
+    storageBucket:"fpd-meeting-portal.firebasestorage.app",
+    messagingSenderId:"535124922202",
+    appId:"1:535124922202:web:324f281a1c301582616d63"
+  };
+  firebase.initializeApp(firebaseConfig);
+  db=firebase.database();
+  SYNC_REF=db.ref('fpd_meeting/state');
+  ARCHIVE_REF=db.ref('fpd_meeting/archive');
+  NOTIF_REF=db.ref('fpd_meeting/notification');
+  CALENDAR_REF=db.ref('fpd_meeting/calendar');
+  FUTURE_REF=db.ref('fpd_meeting/future_agendas');
+  _fbAvailable=true;
+}catch(e){
+  console.warn('Firebase unavailable — running in local-only mode.',e);
+}
 
 // ── Constants ──
 const PASSWORD='FPD-101';
@@ -518,6 +525,7 @@ let _ignoreNextSync=false;
 
 // ── Firebase sync ──
 function pushToFirebase(){
+  if(!_fbAvailable||!SYNC_REF)return;
   _ignoreNextSync=true;
   const payload={
     status:S.status,broadcastItem:S.broadcastItem||null,mtg:S.mtg,
@@ -546,38 +554,40 @@ function applyFirebaseData(d){
   if(d.minutes)S.minutes=d.minutes;
 }
 
-SYNC_REF.on('value',snap=>{
-  const d=snap.val();if(!d)return;
-  if(_ignoreNextSync){_ignoreNextSync=false;return;}
-  applyFirebaseData(d);
-  if(S.currentUser)refreshAll();
-});
-
-NOTIF_REF.on('value',snap=>{
-  const n=snap.val();if(!n||!S.currentUser)return;
-  if(n.id===S.lastNotifId)return;
-  S.lastNotifId=n.id;showToast(n);
-});
-
-CALENDAR_REF.on('value',snap=>{
-  const d=snap.val();
-  S.calendar=d?Object.values(d).sort((a,b)=>a.date.localeCompare(b.date)):[];
-  if(document.getElementById('calendarPanel')?.classList.contains('active'))renderCalendar();
-});
-
-FUTURE_REF.on('value',snap=>{
-  S.futureAgendas=snap.val()||{};
-  if(document.getElementById('calendarPanel')?.classList.contains('active'))renderCalendar();
-  if(document.getElementById('futureAgendaModal')?.classList.contains('open'))renderFutureAgendaModal();
-  if(S.status==='adjourned'&&S.currentUser)renderNow();
-});
-
-db.ref('.info/connected').on('value',snap=>{
-  const c=snap.val();
-  const dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');
-  if(dot)dot.className='sync-dot'+(c?'':' offline');
-  if(lbl)lbl.textContent=c?'Live sync':'Reconnecting…';
-});
+if(_fbAvailable){
+  SYNC_REF.on('value',snap=>{
+    const d=snap.val();if(!d)return;
+    if(_ignoreNextSync){_ignoreNextSync=false;return;}
+    applyFirebaseData(d);
+    if(S.currentUser)refreshAll();
+  });
+  NOTIF_REF.on('value',snap=>{
+    const n=snap.val();if(!n||!S.currentUser)return;
+    if(n.id===S.lastNotifId)return;
+    S.lastNotifId=n.id;showToast(n);
+  });
+  CALENDAR_REF.on('value',snap=>{
+    const d=snap.val();
+    S.calendar=d?Object.values(d).sort((a,b)=>a.date.localeCompare(b.date)):[];
+    if(document.getElementById('calendarPanel')?.classList.contains('active'))renderCalendar();
+  });
+  FUTURE_REF.on('value',snap=>{
+    S.futureAgendas=snap.val()||{};
+    if(document.getElementById('calendarPanel')?.classList.contains('active'))renderCalendar();
+    if(document.getElementById('futureAgendaModal')?.classList.contains('open'))renderFutureAgendaModal();
+    if(S.status==='adjourned'&&S.currentUser)renderNow();
+  });
+  db.ref('.info/connected').on('value',snap=>{
+    const c=snap.val();
+    const dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');
+    if(dot)dot.className='sync-dot'+(c?'':' offline');
+    if(lbl)lbl.textContent=c?'Live sync':'Reconnecting…';
+  });
+} else {
+  // Local-only mode — hide sync indicator
+  const ss=document.getElementById('syncStatus');
+  if(ss)ss.style.display='none';
+}
 
 // ── Helpers ──
 function uid(){return Math.random().toString(36).slice(2,9)}
@@ -649,6 +659,7 @@ function showToast(n){
 }
 function dismissToast(){const w=document.getElementById('toastWrap');if(w){w.style.display='none';w.innerHTML='';}}
 function pushNotification(a){
+  if(!_fbAvailable)return;
   const{yes,no,abs}=voteTotals(a);
   const result=voteResult(a);
   const n={id:'notif_'+Date.now(),itemTitle:a.title,result,yes,no,abs,ts:ts()};
@@ -832,7 +843,7 @@ function concludeMeeting(){
   saveMinutesToArchive(()=>{
     // 5 — mark current calendar entry as completed
     const curCal=S.calendar.find(c=>c.date===S.mtg.date);
-    if(curCal)CALENDAR_REF.child(curCal.id).update({status:'completed'});
+    if(curCal&&_fbAvailable)CALENDAR_REF.child(curCal.id).update({status:'completed'});
 
     // 6 — build next meeting
     if(next){
@@ -897,6 +908,7 @@ function buildMinutesText(){
 }
 
 function saveAgendaToArchive(){
+  if(!_fbAvailable)return;
   const text=buildAgendaText();
   const dateLabel=fmtDateShort(S.mtg.date);
   const id='archive_agenda_'+S.mtg.date.replace(/-/g,'');
@@ -906,6 +918,7 @@ function saveAgendaToArchive(){
   if(idx>=0)S.archive[idx]=entry;else S.archive.unshift(entry);
 }
 function saveMinutesToArchive(cb){
+  if(!_fbAvailable){if(cb)cb();return;}
   const text=buildMinutesText();
   const dateLabel=fmtDateShort(S.mtg.date);
   const id='archive_minutes_'+S.mtg.date.replace(/-/g,'');
@@ -931,6 +944,7 @@ function openAddMtg(){
 }
 function closeAddMtg(){document.getElementById('addMtgModal').classList.remove('open')}
 function saveNewMeeting(){
+  if(!_fbAvailable){alert('Firebase not connected.');return;}
   const date=document.getElementById('nm_date').value;
   if(!date){alert('Please select a date.');return}
   const id='cal_'+date.replace(/-/g,'');
@@ -938,11 +952,11 @@ function saveNewMeeting(){
   CALENDAR_REF.child(id).set(entry).then(()=>{closeAddMtg();renderCalendar();});
 }
 function deleteCalEntry(id){
-  if(!confirm('Remove this meeting?'))return;
+  if(!_fbAvailable||!confirm('Remove this meeting?'))return;
   CALENDAR_REF.child(id).remove();
 }
 function clearCalendar(){
-  if(!confirm('Remove all scheduled meetings?'))return;
+  if(!_fbAvailable||!confirm('Remove all scheduled meetings?'))return;
   CALENDAR_REF.remove();
 }
 function openSeriesModal(){
@@ -967,6 +981,7 @@ function saveSeries(){
     updates[id]={id,date:dateStr,start:stime,end:etime,loc,status:'upcoming'};
     cur.setDate(cur.getDate()+freq);count++;
   }
+  if(!_fbAvailable){alert('Firebase not connected.');return;}
   CALENDAR_REF.update(updates).then(()=>{closeSeriesModal();renderCalendar();});
 }
 function renderCalendar(){
@@ -1024,6 +1039,7 @@ function addFutureItem(dateKey){
   FUTURE_REF.child(dateKey).child(id).set(item).then(()=>{inp.value='';});
 }
 function removeFutureItem(dateKey,id){
+  if(!_fbAvailable)return;
   FUTURE_REF.child(dateKey).child(id).remove();
 }
 
@@ -1203,7 +1219,7 @@ function renderNow(){
       ${futureAgendaHtml}`
       :`<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
         <div style="font-size:13px;color:var(--color-text-secondary)">No future meetings scheduled.</div>
-        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel('calendarPanel',document.getElementById('calTab'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
+        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel('calendarPanel',document.getElementById('calendarTab'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
       </div>`}
     </div>`;return;
   }
@@ -1346,7 +1362,7 @@ function advanceToNextMeeting(){
   S.agenda=newAgenda;S.minutes=[];S.status='notstarted';S.broadcastItem=null;
   S.members.forEach(m=>{m.attendance=false;});
   // clear future agenda items for this date since they're now loaded
-  FUTURE_REF.child(next.date.replace(/-/g,'')).remove();
+  if(_fbAvailable)FUTURE_REF.child(next.date.replace(/-/g,'')).remove();
   pushToFirebase();
   updateBannerText();updateBanner();renderRoster();renderAgenda();renderMinutes();renderNow();
   showPanel('nowPanel',document.getElementById('tabNow'));
@@ -1398,6 +1414,7 @@ function renderFutureAgendaModal(){
 }
 
 function addFutureItemModal(){
+  if(!_fbAvailable)return;
   const title=document.getElementById('futNewTitle').value.trim();if(!title)return;
   const type=document.getElementById('futNewType').value;
   const desc=document.getElementById('futNewDesc').value.trim();
@@ -1516,8 +1533,8 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
-function deleteOne(id){if(!confirm('Delete?'))return;ARCHIVE_REF.child(id).remove().then(()=>{S.archive=S.archive.filter(a=>a.id!==id);renderPastMinutes();})}
-function clearArchive(){if(!confirm('Clear all past records?'))return;ARCHIVE_REF.remove().then(()=>{S.archive=[];renderPastMinutes();})}
+function deleteOne(id){if(!_fbAvailable||!confirm('Delete?'))return;ARCHIVE_REF.child(id).remove().then(()=>{S.archive=S.archive.filter(a=>a.id!==id);renderPastMinutes();})}
+function clearArchive(){if(!_fbAvailable||!confirm('Clear all past records?'))return;ARCHIVE_REF.remove().then(()=>{S.archive=[];renderPastMinutes();})}
 function uploadMinutes(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();r.onload=ev=>{
