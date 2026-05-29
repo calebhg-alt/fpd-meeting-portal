@@ -176,6 +176,24 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .save-banner.show{display:flex}
 .next-mtg{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 14px;font-size:13px;color:var(--color-text-secondary);margin-top:1rem}
 .watermark{position:fixed;bottom:12px;right:16px;font-size:11px;font-weight:500;color:rgba(78,155,173,.45);letter-spacing:.04em;pointer-events:none;user-select:none;z-index:9999;font-family:var(--font-sans)}
+
+/* ── Vote outcome toast ── */
+.toast-wrap{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9998;pointer-events:none;width:90%;max-width:420px}
+.toast{border-radius:var(--border-radius-lg);padding:14px 18px;font-size:14px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;align-items:center;gap:12px;animation:slideDown .35s ease;pointer-events:auto}
+@keyframes slideDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+.toast.toast-passed{background:#4E9BAD;color:#fff}
+.toast.toast-failed{background:#7A2E43;color:#fff}
+.toast.toast-tied{background:#E8741A;color:#fff}
+.toast-icon{font-size:22px;flex-shrink:0}
+.toast-body{flex:1}
+.toast-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.toast-sub{font-size:12px;opacity:.88;font-weight:400}
+.toast-close{cursor:pointer;opacity:.7;font-size:18px;line-height:1;padding:2px 4px}
+.toast-close:hover{opacity:1}
+
+/* ── Conclude banner ── */
+.conclude-banner{background:#f0f8fa;border:1px solid #4E9BAD;border-radius:var(--border-radius-lg);padding:14px 16px;margin-top:12px;display:none}
+.conclude-banner.show{display:block}
 </style>
 </head>
 <body>
@@ -280,6 +298,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-success" id="callOrderBtn" onclick="callToOrder()" style="display:none"><i class="ti ti-gavel"></i> Call to order</button>
       <button class="btn btn-danger" id="adjournBtn" onclick="adjourn()" style="display:none"><i class="ti ti-door-exit"></i> Adjourn</button>
+      <button class="btn btn-primary" id="concludeBtn" onclick="concludeMeeting()" style="display:none"><i class="ti ti-flag-check"></i> Conclude &amp; compile notes</button>
     </div>
   </div>
 
@@ -333,6 +352,10 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
   </div>
 </div>
 
+
+<!-- Vote outcome toast -->
+<div class="toast-wrap" id="toastWrap" style="display:none"></div>
+
 <div class="watermark">Created by: Caleb Healey</div>
 
 <script>
@@ -353,6 +376,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const SYNC_REF = db.ref('fpd_meeting/state');
 const ARCHIVE_REF = db.ref('fpd_meeting/archive');
+const NOTIF_REF = db.ref('fpd_meeting/notification');
 
 // ═══════════════════════════════════════════════
 //  CONSTANTS
@@ -412,6 +436,7 @@ const S={
   currentUser:null,
   members:[],
   archive:[],
+  lastNotifId:null,
   // synced via Firebase:
   status:'notstarted',
   broadcastItem:null,
@@ -458,6 +483,7 @@ function applyFirebaseData(d){
   if(d.minutes)S.minutes=d.minutes;
 }
 
+
 // Listen for real-time updates from Firebase
 SYNC_REF.on('value', snapshot=>{
   const d=snapshot.val();
@@ -467,6 +493,16 @@ SYNC_REF.on('value', snapshot=>{
   if(S.currentUser)refreshAll();
 },{
   onlyOnce:false
+});
+
+
+// Listen for vote outcome notifications
+NOTIF_REF.on('value', snap=>{
+  const n=snap.val();
+  if(!n||!S.currentUser)return;
+  if(n.id===S.lastNotifId)return; // already seen
+  S.lastNotifId=n.id;
+  showToast(n);
 });
 
 // Connection state indicator
@@ -531,8 +567,72 @@ function autoCloseVoting(a){
       'Roll call: '+roll+'. Result: Yes '+yes+', No '+no+(abs?', Abstain '+abs:'')+(absent?', Absent '+absent:'')+'. Motion '+res+'.','decision');
   }
   a.status='complete';
+  if(wasOpen) pushNotification(a);
 }
 function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
+
+
+// ═══════════════════════════════════════════════
+//  VOTE OUTCOME TOAST (shown to all users)
+// ═══════════════════════════════════════════════
+function showToast(n){
+  const wrap=document.getElementById('toastWrap');if(!wrap)return;
+  const cls=n.result==='passed'?'toast-passed':n.result==='failed'?'toast-failed':'toast-tied';
+  const icon=n.result==='passed'?'ti-circle-check':n.result==='failed'?'ti-circle-x':'ti-minus';
+  const label=n.result==='passed'?'Motion Passes':n.result==='failed'?'Motion Fails':'Tied — Motion Fails';
+  wrap.style.display='block';
+  wrap.innerHTML=`<div class="toast ${cls}">
+    <i class="ti ${icon} toast-icon"></i>
+    <div class="toast-body">
+      <div class="toast-title">${esc(n.itemTitle)}</div>
+      <div class="toast-sub">${label} &nbsp;·&nbsp; Yes: ${n.yes} &nbsp; No: ${n.no}${n.abs?' &nbsp; Abstain: '+n.abs:''}</div>
+    </div>
+    <span class="toast-close" onclick="dismissToast()">×</span>
+  </div>`;
+  clearTimeout(wrap._timer);
+  wrap._timer=setTimeout(dismissToast, 7000);
+}
+function dismissToast(){
+  const wrap=document.getElementById('toastWrap');
+  if(wrap){wrap.style.display='none';wrap.innerHTML='';}
+}
+function pushNotification(a){
+  const{yes,no,abs}=voteTotals(a);
+  const result=voteResult(a);
+  const n={id:'notif_'+Date.now(),itemTitle:a.title,result,yes,no,abs,ts:ts()};
+  S.lastNotifId=n.id;
+  NOTIF_REF.set(n).catch(e=>console.error('Notif error:',e));
+  showToast(n); // show immediately on chair's device
+}
+
+// ═══════════════════════════════════════════════
+//  CONCLUDE MEETING
+// ═══════════════════════════════════════════════
+function concludeMeeting(){
+  if(!isAdmin())return;
+  if(!confirm('Conclude the meeting?\n\nThis will:\n• Close any open motions or votes\n• Add all chair notes to the minutes\n• Mark the meeting as adjourned'))return;
+
+  // Close any open votes/motions
+  S.agenda.forEach(a=>{
+    if(a.voteOpen||a.motionOpen){a.voteOpen=false;a.motionOpen=false;}
+  });
+
+  // Compile all agenda item notes into minutes
+  addMinute('─── Meeting Notes Compiled ───','note');
+  S.agenda.forEach((a,i)=>{
+    if(a.notes&&a.notes.length){
+      addMinute(toRoman(i+1)+'. '+a.title,'note');
+      a.notes.forEach(n=>{
+        addMinute('   ['+n.type.toUpperCase()+'] '+n.text,'note');
+      });
+    }
+  });
+
+  // Adjourn
+  S.status='adjourned';S.broadcastItem=null;
+  addMinute('Meeting concluded and adjourned. Next meeting: August 26, 2026.','decision');
+  pushToFirebase();updateBanner();renderRoster();renderMinutes();renderNow();
+}
 
 // ═══════════════════════════════════════════════
 //  INIT
@@ -587,6 +687,8 @@ function enterApp(){
   document.getElementById('settingsBtn').style.display=admin?'inline-flex':'none';
   document.getElementById('callOrderBtn').style.display=admin&&S.status==='notstarted'?'inline-flex':'none';
   document.getElementById('adjournBtn').style.display=admin&&S.status==='inprogress'?'inline-flex':'none';
+  const concludeBtn=document.getElementById('concludeBtn');
+  if(concludeBtn)concludeBtn.style.display=admin&&S.status==='inprogress'?'inline-flex':'none';
   refreshAll();showPanel('nowPanel',document.getElementById('tabNow'));
 }
 
@@ -627,6 +729,7 @@ function updateBanner(){
   if(isAdmin()){
     document.getElementById('callOrderBtn').style.display=S.status==='notstarted'?'inline-flex':'none';
     document.getElementById('adjournBtn').style.display=S.status==='inprogress'?'inline-flex':'none';
+    const cb=document.getElementById('concludeBtn');if(cb)cb.style.display=S.status==='inprogress'?'inline-flex':'none';
   }
 }
 
@@ -848,7 +951,10 @@ function renderNow(){
     chairPanel=`<div class="chair-ctrl">
       <div class="chair-ctrl-title"><i class="ti ti-gavel" style="font-size:13px"></i> Chair controls — private</div>
       <div class="sec-hd">Agenda navigation</div>${buildAgendaNav(a.id)}
-      <div style="margin-bottom:12px"><button class="btn btn-xs ${a.status==='complete'?'btn-success':''}" onclick="markItemDone('${a.id}')">${a.status==='complete'?'✓ Item complete':'Mark item complete'}</button></div>
+      <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-xs ${a.status==='complete'?'btn-success':''}" onclick="markItemDone('${a.id}')">${a.status==='complete'?'✓ Item complete':'Mark item complete'}</button>
+        <button class="btn btn-xs btn-primary" onclick="concludeMeeting()"><i class="ti ti-flag-check"></i> Conclude meeting</button>
+      </div>
       <div class="sec-hd">Private notes (not shown to members)</div>
       <div style="margin-bottom:8px">${notesHtml}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
