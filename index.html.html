@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FPD Committee Meeting Portal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --color-background-primary:#ffffff;--color-background-secondary:#f5f5f4;
+  --color-background-danger:#fde8e8;--color-background-info:#e6f1fb;
+  --color-background-success:#eaf3de;--color-background-warning:#fef0d4;
+  --color-text-primary:#1a1917;--color-text-secondary:#706f6c;
+  --color-text-danger:#922020;--color-text-info:#0c447c;
+  --color-text-success:#2d6a0a;--color-text-warning:#7a4e06;
+  --color-border-secondary:#d4d3d0;--color-border-tertiary:#e8e7e4;
+  --color-border-info:#b8ccf5;--color-border-success:#97c459;
+  --color-border-danger:#f09595;
+  --border-radius-md:6px;--border-radius-lg:10px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --color-background-primary:#1c1b19;--color-background-secondary:#2a2927;
+    --color-background-danger:#3d1515;--color-background-info:#0d2540;
+    --color-background-success:#142808;--color-background-warning:#3d2800;
+    --color-text-primary:#f0efec;--color-text-secondary:#9c9a96;
+    --color-text-danger:#f09595;--color-text-info:#93bbf5;
+    --color-text-success:#97c459;--color-text-warning:#e4a94b;
+    --color-border-secondary:#3d3c39;--color-border-tertiary:#2e2d2b;
+    --color-border-info:#1a4a80;--color-border-success:#2d6a0a;--color-border-danger:#7a2020;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-sans);background:var(--color-background-primary);color:var(--color-text-primary)}
+.app{max-width:680px;margin:0 auto;padding:1rem}
+.screen{display:none}.screen.active{display:block}
+.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+.login-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:2rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{text-align:center;margin-bottom:1.5rem}
+.login-logo-icon{font-size:36px;color:var(--color-text-secondary);margin-bottom:8px;display:block}
+.login-title{font-size:17px;font-weight:600;color:var(--color-text-primary)}
+.login-sub{font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5}
+.fl{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:5px;margin-top:14px}
+.login-err{font-size:12px;color:var(--color-text-danger);background:var(--color-background-danger);border-radius:var(--border-radius-md);padding:8px 12px;margin-top:10px;display:none}
+input,select,textarea{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none;font-family:var(--font-sans)}
+input:focus,select:focus,textarea:focus{border-color:#4a9c2e}
+.banner{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:12px 16px;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dot-idle{background:var(--color-text-secondary)}.dot-live{background:#4a9c2e;animation:blink 1.4s infinite}.dot-adj{background:#c0392b}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.body-name{font-size:15px;font-weight:600;color:var(--color-text-primary)}
+.body-sub{font-size:12px;color:var(--color-text-secondary);margin-top:1px}
+.status-pill{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:500;border:0.5px solid}
+.pill-idle{background:var(--color-background-secondary);color:var(--color-text-secondary);border-color:var(--color-border-secondary)}
+.pill-live{background:#d4edba;color:#2d6a0a;border-color:#7db84a}
+.pill-adj{background:#fde8e8;color:#922020;border-color:#e88080}
+.live-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#d4edba;color:#2d6a0a;border:0.5px solid #7db84a}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#4a9c2e;animation:blink 1s infinite}
+.nav{display:flex;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:1.25rem;overflow-x:auto}
+.nav-tab{padding:8px 12px;font-size:13px;cursor:pointer;color:var(--color-text-secondary);border-bottom:2px solid transparent;margin-bottom:-0.5px;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
+.nav-tab.active{color:var(--color-text-primary);font-weight:500;border-bottom-color:#4a9c2e}
+.panel{display:none}.panel.active{display:block}
+.btn{border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);border-radius:var(--border-radius-md);padding:7px 13px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:var(--font-sans);transition:background .15s}
+.btn:hover{background:var(--color-background-secondary)}
+.btn-primary{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.btn-success{background:#d4edba;color:#2d6a0a;border-color:#7db84a}
+.btn-danger{background:#fde8e8;color:#922020;border-color:#e88080}
+.btn-sm{padding:4px 10px;font-size:12px}.btn-xs{padding:3px 8px;font-size:11px}
+.sec-hd{font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.row{display:flex;gap:8px;margin-bottom:.875rem}
+.row input,.row select{flex:1;font-size:13px}
+.empty{text-align:center;color:var(--color-text-secondary);font-size:13px;padding:1.5rem 0}
+.mvc-vb{border:2px solid transparent;border-radius:var(--border-radius-md);padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans);transition:all .2s;opacity:.28;background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.mvc-vb:hover{opacity:.6}
+.mvc-vb-yes{border-color:#4a9c2e;color:#2d6a0a;background:#d4edba}.mvc-vb-yes.selected{opacity:1;background:#4a9c2e;color:#fff;border-color:#2d6a0a;box-shadow:0 3px 12px rgba(74,156,46,.5);transform:scale(1.04)}
+.mvc-vb-no{border-color:#c0392b;color:#7a1a12;background:#fde8e8}.mvc-vb-no.selected{opacity:1;background:#c0392b;color:#fff;border-color:#922020;transform:scale(1.04)}
+.mvc-vb-abs{border-color:#d4860a;color:#7a4e06;background:#fef0d4}.mvc-vb-abs.selected{opacity:1;background:#d4860a;color:#fff;border-color:#9c5f04;transform:scale(1.04)}
+.mvc-vb-absent{border-color:#7a7875;color:#4a4845;background:#efeeec}.mvc-vb-absent.selected{opacity:1;background:#7a7875;color:#fff;border-color:#4a4845;transform:scale(1.04)}
+.motion-btn{border:2px solid var(--color-border-secondary);background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-sans);color:var(--color-text-secondary);transition:all .18s;opacity:.5}
+.motion-btn:hover{opacity:.8}
+.motion-btn.sel-move{opacity:1;background:#1a5fb4;color:#fff;border-color:#1a5fb4;box-shadow:0 2px 8px rgba(26,95,180,.4)}
+.motion-btn.sel-second{opacity:1;background:#7209b7;color:#fff;border-color:#7209b7;box-shadow:0 2px 8px rgba(114,9,183,.4)}
+.motion-btn.taken{opacity:.22;cursor:not-allowed}
+.vote-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;white-space:nowrap}
+.vc-yes{background:#4a9c2e;color:#fff}.vc-no{background:#c0392b;color:#fff}.vc-abstain{background:#d4860a;color:#fff}.vc-absent{background:#888780;color:#fff}
+.vc-none{background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary)}
+.avb{border:1.5px solid var(--color-border-tertiary);background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-sans);color:var(--color-text-secondary);transition:all .15s;white-space:nowrap}
+.avb:hover{background:var(--color-background-secondary)}
+.avb.avb-yes{border-color:#4a9c2e;color:#2d6a0a;background:#d4edba}.avb.avb-yes.on{background:#4a9c2e;color:#fff;border-color:#2d6a0a}
+.avb.avb-no{border-color:#c0392b;color:#922020;background:#fde8e8}.avb.avb-no.on{background:#c0392b;color:#fff;border-color:#922020}
+.avb.avb-abs{border-color:#d4860a;color:#7a4e06;background:#fef0d4}.avb.avb-abs.on{background:#d4860a;color:#fff;border-color:#9c5f04}
+.avb.avb-absent{border-color:#888780;color:#4a4845;background:#efeeec}.avb.avb-absent.on{background:#888780;color:#fff;border-color:#555}
+.tally-result-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.tally{font-size:12px;padding:5px 13px;border-radius:999px;font-weight:600}
+.t-yes{background:#4a9c2e;color:#fff}.t-no{background:#c0392b;color:#fff}.t-abs{background:#d4860a;color:#fff}.t-absent{background:#888780;color:#fff}
+.tally-divider{width:1px;height:20px;background:var(--color-border-secondary);flex-shrink:0}
+.result-inline{font-size:13px;font-weight:700;padding:5px 16px;border-radius:999px;display:inline-flex;align-items:center;gap:5px}
+.ri-passed{background:#4a9c2e;color:#fff}.ri-failed{background:#c0392b;color:#fff}.ri-tied{background:#d4860a;color:#fff}.ri-pending{background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)}
+.member-card{display:flex;align-items:center;gap:10px;padding:9px 14px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:7px;background:var(--color-background-primary)}
+.member-card.vacant-card{opacity:.5}
+.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.av-blue{background:#E6F1FB;color:#0C447C}.av-teal{background:#E1F5EE;color:#085041}.av-purple{background:#EEEDFE;color:#3C3489}
+.av-coral{background:#FAECE7;color:#712B13}.av-amber{background:#FAEEDA;color:#633806}.av-green{background:#EAF3DE;color:#27500A}.av-gray{background:#F1EFE8;color:#444441}
+.member-info{flex:1;min-width:0}
+.member-name{font-size:13px;font-weight:500;color:var(--color-text-primary);line-height:1.3}
+.member-role-txt{font-size:11px;color:var(--color-text-secondary);margin-top:1px}
+.att-badge{font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;white-space:nowrap}
+.att-present{background:#d4edba;color:#2d6a0a}.att-override{background:#E6F1FB;color:#0C447C}.att-absent-b{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.quorum-bar{height:6px;background:var(--color-background-secondary);border-radius:999px;overflow:hidden;margin:6px 0 4px}
+.q-fill{height:6px;border-radius:999px;transition:width .4s}
+.q-met{background:#4a9c2e}.q-short{background:#c0392b}
+.agenda-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:10px;overflow:hidden;background:var(--color-background-primary)}
+.agenda-card.is-live{border-color:#4a9c2e;border-width:2px}
+.ag-hdr{display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer}
+.ag-hdr:hover{background:var(--color-background-secondary)}
+.ag-num{font-size:11px;font-weight:600;color:var(--color-text-secondary);min-width:22px}
+.type-badge{font-size:10px;padding:2px 8px;border-radius:999px;flex-shrink:0;font-weight:500}
+.tb-discussion{background:#E6F1FB;color:#0C447C}.tb-action{background:#fef0d4;color:#7a4e06}
+.tb-consent{background:#EEEDFE;color:#3C3489}.tb-public{background:#E1F5EE;color:#085041}.tb-info{background:#F1EFE8;color:#444441}
+.ag-title{font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1}
+.ag-status{font-size:11px;padding:2px 8px;border-radius:999px}
+.as-pending{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.as-live{background:#d4edba;color:#2d6a0a}.as-voting{background:#d4edba;color:#2d6a0a}
+.as-motion{background:#eef4ff;color:#1a5fb4}.as-complete{background:#E6F1FB;color:#0C447C}
+.chevron{font-size:14px;color:var(--color-text-secondary);transition:transform .2s}.chevron.open{transform:rotate(180deg)}
+.ag-body{display:none;padding:12px 14px;border-top:0.5px solid var(--color-border-tertiary)}
+.vote-roll{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 10px}
+.vote-roll th{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-align:left;padding:5px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.vote-roll td{padding:6px 8px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+.vote-roll tr:last-child td{border-bottom:none}
+.me-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.me-note{background:#888780}.me-motion{background:#378ADD}.me-decision{background:#4a9c2e}.me-action{background:#d4860a}
+.minute-entry{display:flex;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);align-items:flex-start}
+.minute-entry:last-child{border-bottom:none}
+.me-text{font-size:13px;color:var(--color-text-primary);flex:1;line-height:1.5}
+.me-ts{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.current-item-card{border:2px solid #4a9c2e;border-radius:var(--border-radius-lg);background:var(--color-background-primary);margin-bottom:1.25rem;overflow:hidden}
+.ci-header{background:#4a9c2e;padding:10px 16px;display:flex;align-items:center;gap:8px}
+.ci-header-text{font-size:13px;font-weight:600;color:#fff;flex:1}
+.ci-num{font-size:11px;font-weight:700;color:rgba(255,255,255,.75)}
+.ci-body{padding:14px 16px}
+.ci-title{font-size:16px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px}
+.ci-desc{font-size:13px;color:var(--color-text-secondary);line-height:1.55;margin-bottom:12px}
+.motion-open-box{background:#eef4ff;border:1px solid #b8ccf5;border-radius:var(--border-radius-lg);padding:14px 16px;margin-bottom:14px}
+.motion-open-title{font-size:12px;font-weight:600;color:#1a5fb4;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.chair-ctrl{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:12px 14px;margin-top:12px}
+.chair-ctrl-title{font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.ag-nav-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;align-items:flex-start}
+.ag-nav-btn{display:inline-flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-secondary);border-radius:var(--border-radius-md);padding:5px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font-sans);transition:all .15s;min-width:38px;text-align:center}
+.ag-nav-btn:hover{background:var(--color-background-secondary)}
+.ag-nav-btn .ag-nav-num{font-size:13px;font-weight:600;line-height:1}
+.ag-nav-btn .ag-nav-label{font-size:9px;color:var(--color-text-secondary);max-width:60px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.2}
+.ag-nav-btn.ag-nav-current{background:#4a9c2e;color:#fff;border-color:#2d6a0a;box-shadow:0 0 0 3px rgba(74,156,46,.25),0 2px 8px rgba(74,156,46,.35);transform:scale(1.08);z-index:1;position:relative}
+.ag-nav-btn.ag-nav-current .ag-nav-num,.ag-nav-btn.ag-nav-current .ag-nav-label{color:#fff}
+.ag-nav-btn.ag-nav-done{background:#EAF3DE;color:#3B6D11;border-color:#97C459;opacity:.7}
+.ag-nav-btn.ag-nav-done .ag-nav-label{color:#3B6D11}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:1.5rem;width:360px;max-width:95%;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:1rem}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem}
+.mfl{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;margin-top:10px}
+.past-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:10px;overflow:hidden}
+.past-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+.past-hdr:hover{background:var(--color-background-secondary)}
+.past-date-badge{font-size:11px;padding:2px 10px;border-radius:999px;background:#E6F1FB;color:#0C447C;font-weight:500;flex-shrink:0}
+.past-title{font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1}
+.past-meta{font-size:11px;color:var(--color-text-secondary)}
+.past-body{display:none;padding:14px;border-top:0.5px solid var(--color-border-tertiary)}
+.past-text{font-size:12px;color:var(--color-text-secondary);white-space:pre-wrap;line-height:1.7;max-height:380px;overflow-y:auto;font-family:monospace;background:var(--color-background-secondary);padding:12px;border-radius:var(--border-radius-md)}
+.save-banner{background:#d4edba;border:0.5px solid #7db84a;border-radius:var(--border-radius-md);padding:10px 14px;font-size:13px;color:#2d6a0a;display:none;margin-bottom:1rem;align-items:center;gap:8px}
+.save-banner.show{display:flex}
+.next-mtg{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 14px;font-size:13px;color:var(--color-text-secondary);margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h3><i class="ti ti-settings" style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Meeting details</h3>
+    <label class="mfl">Committee / body name</label>
+    <input type="text" id="set_name" style="width:100%;font-size:13px">
+    <label class="mfl">Meeting date</label>
+    <input type="date" id="set_date" style="width:100%;font-size:13px">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label class="mfl">Start time</label><input type="time" id="set_start" style="width:100%;font-size:13px"></div>
+      <div style="flex:1"><label class="mfl">End time</label><input type="time" id="set_end" style="width:100%;font-size:13px"></div>
+    </div>
+    <label class="mfl">Location / room</label>
+    <input type="text" id="set_loc" style="width:100%;font-size:13px" placeholder="e.g. L201 / Zoom">
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="screen active">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <i class="ti ti-school login-logo-icon"></i>
+        <div class="login-title" id="loginTitle">Faculty Professional Development Committee</div>
+        <div class="login-sub" id="loginSub">Antelope Valley College</div>
+      </div>
+      <label class="fl">Select your name</label>
+      <select id="loginName" style="width:100%;font-size:14px"><option value="">— choose your name —</option></select>
+      <label class="fl">Meeting password</label>
+      <input type="password" id="loginPass" style="width:100%;font-size:14px" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:16px;justify-content:center;font-size:14px;padding:10px" onclick="doLogin()">
+        <i class="ti ti-login"></i> Sign in
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainScreen" class="screen">
+  <div class="banner">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="status-dot dot-idle" id="statusDot"></div>
+      <div>
+        <div class="body-name" id="bannerName">Faculty Professional Development Committee</div>
+        <div class="body-sub" id="bannerSub"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="status-pill pill-idle" id="statusPill">Not started</span>
+      <span class="live-badge" id="liveBadge" style="display:none"><span class="live-dot"></span>LIVE</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="avatar av-blue" id="userAvBanner" style="width:26px;height:26px;font-size:10px;font-weight:600"></div>
+        <span style="font-size:12px;color:var(--color-text-primary)" id="userNameBanner"></span>
+      </div>
+      <button class="btn btn-sm" id="settingsBtn" style="display:none" onclick="openSettings()" title="Edit meeting details"><i class="ti ti-settings"></i></button>
+      <button class="btn btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i></button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-tab active" id="tabNow" onclick="showPanel('nowPanel',this)"><i class="ti ti-radio"></i> Now</div>
+    <div class="nav-tab" onclick="showPanel('rosterPanel',this)"><i class="ti ti-users"></i> Roster</div>
+    <div class="nav-tab" onclick="showPanel('agendaPanel',this)"><i class="ti ti-list"></i> Agenda</div>
+    <div class="nav-tab" id="minutesTab" style="display:none" onclick="showPanel('minutesPanel',this)"><i class="ti ti-notes"></i> Minutes</div>
+    <div class="nav-tab" onclick="showPanel('pastPanel',this)"><i class="ti ti-archive"></i> Past</div>
+  </div>
+
+  <div id="nowPanel" class="panel active"><div id="nowContent"></div></div>
+
+  <div id="rosterPanel" class="panel">
+    <div id="adminAddMember" style="display:none;margin-bottom:1.25rem">
+      <div class="sec-hd">Add member</div>
+      <div class="row">
+        <input type="text" id="mName" placeholder="Full name (or VACANT)" onkeydown="if(event.key==='Enter')addMember()">
+        <input type="text" id="mRole" placeholder="Role / title" onkeydown="if(event.key==='Enter')addMember()">
+        <button class="btn btn-primary" onclick="addMember()"><i class="ti ti-plus"></i> Add</button>
+      </div>
+    </div>
+    <div style="display:none;margin-bottom:10px" id="quorumWrap">
+      <div class="quorum-bar"><div class="q-fill" id="quorumFill"></div></div>
+      <div style="font-size:11px;color:var(--color-text-secondary)" id="quorumText"></div>
+    </div>
+    <div class="sec-hd" style="margin-bottom:8px">Members &amp; attendance</div>
+    <div id="memberList"></div>
+    <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-success" id="callOrderBtn" onclick="callToOrder()" style="display:none"><i class="ti ti-gavel"></i> Call to order</button>
+      <button class="btn btn-danger" id="adjournBtn" onclick="adjourn()" style="display:none"><i class="ti ti-door-exit"></i> Adjourn</button>
+    </div>
+  </div>
+
+  <div id="agendaPanel" class="panel">
+    <div id="adminAddAgenda" style="display:none;margin-bottom:1.25rem">
+      <div class="sec-hd">Add agenda item</div>
+      <div class="row" style="margin-bottom:6px">
+        <input type="text" id="agTitle" placeholder="Item title" style="flex:2">
+        <select id="agType" style="min-width:140px">
+          <option value="discussion">Discussion</option><option value="action">Action item</option>
+          <option value="consent">Consent</option><option value="public">Public comment</option><option value="info">Informational</option>
+        </select>
+      </div>
+      <div class="row"><textarea id="agDesc" placeholder="Description (optional)" style="resize:vertical;min-height:44px;font-family:var(--font-sans);font-size:13px;width:100%"></textarea></div>
+      <button class="btn btn-primary" onclick="addAgendaItem()"><i class="ti ti-plus"></i> Add item</button>
+    </div>
+    <div class="sec-hd">Agenda (<span id="agCount">0</span> items)</div>
+    <div id="agendaList"></div>
+    <div class="next-mtg" id="nextMtgBanner"><i class="ti ti-calendar" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i> Next meeting: <strong>August 26, 2026</strong></div>
+  </div>
+
+  <div id="minutesPanel" class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <div class="sec-hd" style="margin-bottom:0">Meeting record</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportTxt()"><i class="ti ti-download"></i> Export</button>
+        <button class="btn btn-sm btn-success" onclick="saveToArchive()"><i class="ti ti-archive"></i> Save to archive</button>
+        <button class="btn btn-sm" onclick="draftFormal()"><i class="ti ti-file-text"></i> Draft ↗</button>
+      </div>
+    </div>
+    <div class="save-banner" id="saveBanner"><i class="ti ti-circle-check"></i> Saved to Past Minutes.</div>
+    <div id="minutesList"><div class="empty">Minutes appear here as the meeting progresses.</div></div>
+  </div>
+
+  <div id="pastPanel" class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">
+      <div class="sec-hd" style="margin-bottom:0">Past meeting minutes</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="document.getElementById('uploadFile').click()"><i class="ti ti-upload"></i> Upload (.txt)</button>
+        <input type="file" id="uploadFile" accept=".txt,.md" style="display:none" onchange="uploadMinutes(event)">
+        <button class="btn btn-sm" id="clearArchiveBtn" style="display:none;color:var(--color-text-danger)" onclick="clearArchive()"><i class="ti ti-trash"></i> Clear all</button>
+      </div>
+    </div>
+    <div style="margin-bottom:1.25rem;display:none" id="archiveDropdownWrap">
+      <label class="fl" style="margin-top:0">Jump to a past meeting</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <select id="archiveSelect" style="flex:1;font-size:13px" onchange="viewArchiveItem()"><option value="">— select —</option></select>
+        <button class="btn btn-sm btn-danger" id="deleteArchiveBtn" onclick="deleteArchiveItem()" style="display:none"><i class="ti ti-trash"></i> Delete</button>
+      </div>
+    </div>
+    <div id="pastList"></div>
+  </div>
+</div>
+
+<script>
+const PASSWORD='FPD-101';
+const AV=['av-blue','av-teal','av-purple','av-coral','av-amber','av-green','av-gray'];
+const TYPE_LABELS={discussion:'Discussion',action:'Action item',consent:'Consent',public:'Public comment',info:'Informational'};
+const TYPE_BADGE={discussion:'tb-discussion',action:'tb-action',consent:'tb-consent',public:'tb-public',info:'tb-info'};
+const VOTE_LABELS={yes:'Yes',no:'No',abstain:'Abstain',absent:'Absent'};
+const VOTE_CHIP_CLS={yes:'vc-yes',no:'vc-no',abstain:'vc-abstain',absent:'vc-absent'};
+
+const MEMBERS_SEED=[
+  {name:'Kathy Osburn',role:'Faculty Co-Chair'},
+  {name:'Van Rider',role:'Administrative Co-Chair'},
+  {name:'Nathan Dillon',role:'Administrative Council Member'},
+  {name:'James Nasipak',role:'CMSA Representative'},
+  {name:'Greg Krynen',role:'Technical Liaison'},
+  {name:'VACANT',role:'Classified Representative',vacant:true},
+  {name:"Darlene O'Keeffe",role:'Academic Senate Coordinator'},
+  {name:'Noah Stepro',role:'Adjunct Representative'},
+  {name:'Wayne Lynch',role:'Faculty Union Representative'},
+  {name:'Ruben Alcala',role:'Faculty Rep, Counseling'},
+  {name:'Katherine Quesada',role:'Faculty Rep, Counseling'},
+  {name:'VACANT',role:'Faculty Rep, CTE',vacant:true},
+  {name:'Caleb Healey',role:'Faculty Rep, CTE'},
+  {name:'Rona Brynin',role:'Faculty Rep, HSS'},
+  {name:'VACANT',role:'Faculty Rep, HSS',vacant:true},
+  {name:'Dr. Billy Cheewawisuttichai',role:'Faculty Rep, MSE'},
+  {name:'Jane Bowers',role:'Faculty Rep, MSE'},
+  {name:'Mark Hoffer',role:'Faculty Rep, L&CA'},
+  {name:'Dr. Morenike Adebayo-Ige',role:'Faculty Rep, L&CA'},
+  {name:'Glen Knowles',role:'Faculty Rep, A&H'},
+  {name:'VACANT',role:'Faculty Rep, A&H',vacant:true},
+  {name:'Kent Moser',role:'Faculty Rep, SBS'},
+  {name:'Ken Schafer',role:'Faculty Rep, SBS'},
+  {name:'Carrie Miller',role:'Faculty Rep, AKIN'},
+  {name:'VACANT',role:'Faculty Rep, AKIN',vacant:true},
+  {name:'VACANT',role:'ASO Rep',vacant:true}
+];
+const AGENDA_SEED=[
+  {title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for the May 27, 2026 meeting.'},
+  {title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair Kathy Osburn and Administrative Co-Chair Van Rider.'},
+  {title:'Open Comments from the Public',type:'public',desc:'Public comment period.'},
+  {title:'Approval of Previous Minutes — April 22, 2026',type:'action',desc:'Motion to approve the minutes from the April 22, 2026 meeting.'},
+  {title:'Approval of Previous Minutes — May 13, 2026',type:'action',desc:'Motion to approve the minutes from the May 13, 2026 meeting.'},
+  {title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.'},
+  {title:'FEP Reports — Vote',type:'action',desc:'Action item: FEP Reports. Vote required.'},
+  {title:'FPD Credit for Scholarship Review for our Foundation',type:'action',desc:'Action item: FPD Credit for Scholarship Review. Vote required.'},
+  {title:'FPD Seat Addition',type:'action',desc:'Action item: FPD Seat Addition. Vote required.'}
+];
+
+const S={
+  status:'notstarted',members:[],agenda:[],minutes:[],archive:[],
+  broadcastItem:null,currentUser:null,
+  mtg:{name:'Faculty Professional Development Committee',date:'2026-05-27',start:'14:30',end:'16:00',loc:'L201 / Zoom'}
+};
+
+let BC=null;
+try{BC=new BroadcastChannel('fpd_mtg_v5_0527')}catch(e){}
+
+function broadcast(){
+  const p={type:'sync',ts:Date.now(),status:S.status,broadcastItem:S.broadcastItem,mtg:{...S.mtg},
+    members:S.members.map(m=>({id:m.id,attendance:m.attendance})),
+    agenda:S.agenda.map(a=>({id:a.id,status:a.status,voteOpen:a.voteOpen,motionOpen:a.motionOpen,motioner:a.motioner,seconder:a.seconder,votes:{...a.votes},notes:[...a.notes]})),
+    minutes:S.minutes};
+  if(BC)try{BC.postMessage(p)}catch(e){}
+  try{localStorage.setItem('fpd_sync_v5',JSON.stringify(p))}catch(e){}
+}
+function applySync(d){
+  if(!d)return;
+  if(d.status!==undefined)S.status=d.status;
+  if(d.broadcastItem!==undefined)S.broadcastItem=d.broadcastItem;
+  if(d.mtg)Object.assign(S.mtg,d.mtg);
+  if(d.members)d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm)lm.attendance=dm.attendance});
+  if(d.agenda)d.agenda.forEach(da=>{const la=S.agenda.find(x=>x.id===da.id);if(la){la.status=da.status;la.voteOpen=da.voteOpen;la.motionOpen=da.motionOpen;la.motioner=da.motioner;la.seconder=da.seconder;la.votes=da.votes;la.notes=da.notes}});
+  if(d.minutes)S.minutes=d.minutes;
+}
+let lastTs=0;
+function pollSync(){try{const raw=localStorage.getItem('fpd_sync_v5');if(!raw)return;const d=JSON.parse(raw);if(d.ts&&d.ts>lastTs){lastTs=d.ts;applySync(d);refreshAll()}}catch(e){}}
+
+function uid(){return Math.random().toString(36).slice(2,9)}
+function initials(n){if(!n||n==='VACANT')return'—';return String(n).split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function ts(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+function isAdmin(){return S.currentUser&&S.currentUser.role.toLowerCase().includes('chair')}
+function toRoman(n){return(['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'])[n-1]||n}
+function padR(s,l){return String(s||'').padEnd(l,' ')}
+function isPresent(m){return m.attendance==='app'||m.attendance==='override'}
+function presentCount(){return S.members.filter(m=>!m.vacant&&isPresent(m)).length}
+function eligibleCount(){return S.members.filter(m=>!m.vacant).length}
+function quorumNeeded(){return Math.floor(eligibleCount()/2)+1}
+function quorumMet(){return presentCount()>=quorumNeeded()}
+
+function fmtMtgSub(){
+  const d=new Date(S.mtg.date+'T12:00:00');
+  const dateStr=d.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const t=S.mtg.start&&S.mtg.end?S.mtg.start+' – '+S.mtg.end:S.mtg.start||'';
+  return dateStr+(t?' · '+t:'')+(S.mtg.loc?' · '+S.mtg.loc:'');
+}
+function updateBannerText(){
+  document.getElementById('bannerName').textContent=S.mtg.name;
+  document.getElementById('bannerSub').textContent=fmtMtgSub();
+  document.getElementById('loginTitle').textContent=S.mtg.name;
+  document.getElementById('loginSub').textContent='Antelope Valley College · '+fmtMtgSub();
+}
+function openSettings(){
+  document.getElementById('set_name').value=S.mtg.name;
+  document.getElementById('set_date').value=S.mtg.date;
+  document.getElementById('set_start').value=S.mtg.start;
+  document.getElementById('set_end').value=S.mtg.end;
+  document.getElementById('set_loc').value=S.mtg.loc;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){document.getElementById('settingsModal').classList.remove('open')}
+function saveSettings(){
+  S.mtg.name=document.getElementById('set_name').value.trim()||S.mtg.name;
+  S.mtg.date=document.getElementById('set_date').value||S.mtg.date;
+  S.mtg.start=document.getElementById('set_start').value||S.mtg.start;
+  S.mtg.end=document.getElementById('set_end').value||S.mtg.end;
+  S.mtg.loc=document.getElementById('set_loc').value;
+  updateBannerText();broadcast();closeSettings();
+}
+document.getElementById('settingsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSettings()});
+
+function autoFillAbsentVotes(a){
+  S.members.filter(m=>!m.vacant).forEach(m=>{
+    if(!isPresent(m)){if(!a.votes[m.id]||a.votes[m.id]==='absent')a.votes[m.id]='absent';}
+  });
+}
+function voteTotals(a){
+  const vv=Object.values(a.votes);
+  return{yes:vv.filter(v=>v==='yes').length,no:vv.filter(v=>v==='no').length,abs:vv.filter(v=>v==='abstain').length,absent:vv.filter(v=>v==='absent').length};
+}
+function voteResult(a){const{yes,no}=voteTotals(a);if(yes>no)return'passed';if(no>yes)return'failed';return'tied'}
+function resultInlineBadge(result,pending){
+  if(pending)return'<span class="result-inline ri-pending">Awaiting votes\u2026</span>';
+  if(result==='passed')return'<span class="result-inline ri-passed"><i class="ti ti-circle-check" style="font-size:14px"></i> Motion Passes</span>';
+  if(result==='failed')return'<span class="result-inline ri-failed"><i class="ti ti-circle-x" style="font-size:14px"></i> Motion Fails</span>';
+  return'<span class="result-inline ri-tied"><i class="ti ti-minus" style="font-size:14px"></i> Tied \u2014 Fails</span>';
+}
+function autoCloseVoting(a){
+  if(!a)return;
+  const wasOpen=a.voteOpen||a.motionOpen;
+  a.voteOpen=false;a.motionOpen=false;
+  if(wasOpen){
+    autoFillAbsentVotes(a);
+    const{yes,no,abs,absent}=voteTotals(a);
+    const res=yes>no?'PASSES':no>yes?'FAILS':'FAILS (tied)';
+    const mover=S.members.find(m=>m.id===a.motioner);
+    const second=S.members.find(m=>m.id===a.seconder);
+    const present=S.members.filter(m=>!m.vacant&&isPresent(m));
+    const roll=present.map(m=>m.name+': '+(a.votes[m.id]?VOTE_LABELS[a.votes[m.id]]:'—')).join(', ');
+    addMinute('['+a.title+'] '+(mover?'Moved by '+mover.name+'. ':'')+(second?'Seconded by '+second.name+'. ':'')+
+      'Roll call: '+roll+'. Result: Yes '+yes+', No '+no+(abs?', Abstain '+abs:'')+(absent?', Absent '+absent:'')+'. Motion '+res+'.','decision');
+  }
+  a.status='complete';
+}
+
+function init(){
+  MEMBERS_SEED.forEach((m,i)=>S.members.push({id:uid(),name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
+  AGENDA_SEED.forEach(a=>S.agenda.push({id:uid(),title:a.title,type:a.type,desc:a.desc,status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''}));
+  try{const saved=localStorage.getItem('fpd_archive_v5');if(saved)S.archive=JSON.parse(saved)}catch(e){}
+  try{const raw=localStorage.getItem('fpd_sync_v5');if(raw){const d=JSON.parse(raw);if(d.ts&&Date.now()-d.ts<7200000){applySync(d);lastTs=d.ts}}}catch(e){}
+  buildLoginDropdown();updateBannerText();
+  if(BC)BC.onmessage=e=>{if(e.data&&e.data.type==='sync'&&e.data.ts>lastTs){lastTs=e.data.ts;applySync(e.data);refreshAll()}};
+  setInterval(pollSync,2000);
+}
+init();
+
+function refreshAll(){updateBannerText();updateBanner();renderNow();renderRoster();renderAgenda();renderMinutes()}
+function buildLoginDropdown(){
+  const sel=document.getElementById('loginName');
+  sel.innerHTML='<option value="">— choose your name —</option>';
+  S.members.filter(m=>!m.vacant).forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name+' · '+m.role;sel.appendChild(o)});
+}
+function doLogin(){
+  const mid=document.getElementById('loginName').value,pass=document.getElementById('loginPass').value;
+  if(!mid){showErr('Please select your name.');return}
+  if(pass!==PASSWORD){showErr('Incorrect password.');return}
+  const m=S.members.find(x=>x.id===mid);if(!m){showErr('Not found.');return}
+  document.getElementById('loginErr').style.display='none';
+  S.currentUser=m;if(m.attendance!=='app')m.attendance='app';
+  broadcast();enterApp();
+}
+function showErr(msg){const e=document.getElementById('loginErr');e.textContent=msg;e.style.display='block'}
+function doLogout(){
+  S.currentUser=null;document.getElementById('loginPass').value='';buildLoginDropdown();
+  document.getElementById('mainScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+}
+function enterApp(){
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('mainScreen').classList.add('active');
+  document.getElementById('userNameBanner').textContent=S.currentUser.name;
+  document.getElementById('userAvBanner').textContent=initials(S.currentUser.name);
+  document.getElementById('userAvBanner').className='avatar '+S.currentUser.color;
+  const admin=isAdmin();
+  document.getElementById('minutesTab').style.display=admin?'flex':'none';
+  document.getElementById('adminAddMember').style.display=admin?'block':'none';
+  document.getElementById('adminAddAgenda').style.display=admin?'block':'none';
+  document.getElementById('clearArchiveBtn').style.display=admin?'inline-flex':'none';
+  document.getElementById('settingsBtn').style.display=admin?'inline-flex':'none';
+  document.getElementById('callOrderBtn').style.display=admin&&S.status==='notstarted'?'inline-flex':'none';
+  document.getElementById('adjournBtn').style.display=admin&&S.status==='inprogress'?'inline-flex':'none';
+  refreshAll();showPanel('nowPanel',document.getElementById('tabNow'));
+}
+function updateBanner(){
+  const cfg={notstarted:['dot-idle','pill-idle','Not started'],inprogress:['dot-live','pill-live','In progress'],adjourned:['dot-adj','pill-adj','Adjourned']};
+  const[dc,pc,label]=cfg[S.status]||cfg.notstarted;
+  document.getElementById('statusDot').className='status-dot '+dc;
+  document.getElementById('statusPill').className='status-pill '+pc;
+  document.getElementById('statusPill').textContent=label;
+  document.getElementById('liveBadge').style.display=S.status==='inprogress'?'inline-flex':'none';
+  if(isAdmin()){
+    document.getElementById('callOrderBtn').style.display=S.status==='notstarted'?'inline-flex':'none';
+    document.getElementById('adjournBtn').style.display=S.status==='inprogress'?'inline-flex':'none';
+  }
+}
+function callToOrder(){
+  if(!isAdmin())return;
+  if(!quorumMet()){if(!confirm('Quorum not yet met ('+presentCount()+' of '+quorumNeeded()+' needed).\nProceed anyway?'))return}
+  S.status='inprogress';
+  const names=S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>m.role+' '+m.name).join(', ')||'(none yet)';
+  addMinute(S.mtg.name+' called to order. '+fmtMtgSub()+'. Members present: '+names+'.','decision');
+  broadcast();updateBanner();renderRoster();renderMinutes();renderNow();
+}
+function adjourn(){
+  if(!isAdmin())return;
+  S.status='adjourned';S.broadcastItem=null;
+  addMinute('Meeting adjourned. Next meeting: August 26, 2026.','decision');
+  S.agenda.filter(a=>a.voteOpen||a.motionOpen).forEach(a=>{a.voteOpen=false;a.motionOpen=false});
+  broadcast();updateBanner();renderRoster();renderMinutes();renderNow();
+}
+function addMember(){
+  if(!isAdmin())return;
+  const name=document.getElementById('mName').value.trim(),role=document.getElementById('mRole').value.trim()||'Member';
+  if(!name)return;
+  const vacant=name.toUpperCase()==='VACANT';
+  S.members.push({id:uid(),name:vacant?'VACANT':name,role,vacant,attendance:false,color:vacant?'av-gray':AV[S.members.length%6]});
+  document.getElementById('mName').value='';document.getElementById('mRole').value='';
+  buildLoginDropdown();renderRoster();
+}
+function removeMember(id){
+  if(!isAdmin()||!confirm('Remove this member?'))return;
+  S.members=S.members.filter(m=>m.id!==id);buildLoginDropdown();renderRoster();
+}
+function chairToggleAttendance(id){
+  if(!isAdmin())return;
+  const m=S.members.find(x=>x.id===id);if(!m||m.vacant)return;
+  if(m.attendance==='app'){if(!confirm(m.name+' signed in via the app. Mark absent anyway?'))return;m.attendance=false;}
+  else if(m.attendance==='override'){m.attendance=false;}
+  else{m.attendance='override';}
+  broadcast();renderRoster();renderNow();
+}
+function renderRoster(){
+  const el=document.getElementById('memberList');
+  const p=presentCount(),t=eligibleCount(),need=quorumNeeded(),met=p>=need&&t>0;
+  if(t){
+    document.getElementById('quorumWrap').style.display='block';
+    document.getElementById('quorumFill').style.width=Math.round(p/t*100)+'%';
+    document.getElementById('quorumFill').className='q-fill '+(met?'q-met':'q-short');
+    document.getElementById('quorumText').textContent=p+' of '+t+' eligible present · Need '+need+' for quorum · '+(met?'Quorum met ✓':'Quorum not met');
+  }
+  el.innerHTML=S.members.map(m=>{
+    let attBadge='',attBtn='';
+    if(m.vacant){attBadge='<span style="font-size:11px;color:var(--color-text-secondary)">Vacant</span>';}
+    else if(m.attendance==='app'){attBadge='<span class="att-badge att-present"><i class="ti ti-device-mobile" style="font-size:10px"></i> Signed in</span>';if(isAdmin())attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>`;}
+    else if(m.attendance==='override'){attBadge='<span class="att-badge att-override"><i class="ti ti-user-check" style="font-size:10px"></i> Present</span>';if(isAdmin())attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>`;}
+    else{attBadge='<span class="att-badge att-absent-b">Absent</span>';if(isAdmin())attBtn=`<button class="btn btn-xs btn-success" style="margin-left:5px;font-size:11px" onclick="chairToggleAttendance('${m.id}')"><i class="ti ti-user-check"></i> Mark present</button>`;}
+    return`<div class="member-card ${m.vacant?'vacant-card':''}">
+      <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
+      <div class="member-info"><div class="member-name">${esc(m.name)}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:var(--color-text-info)">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
+      <div style="display:flex;align-items:center">${attBadge}${attBtn}</div>
+      ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
+    </div>`;
+  }).join('');
+}
+function showPanel(id,el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');if(el)el.classList.add('active');
+  if(id==='minutesPanel')renderMinutes();if(id==='nowPanel')renderNow();
+  if(id==='rosterPanel')renderRoster();if(id==='pastPanel')renderPastMinutes();
+}
+function addAgendaItem(){
+  if(!isAdmin())return;
+  const title=document.getElementById('agTitle').value.trim();if(!title)return;
+  S.agenda.push({id:uid(),title,type:document.getElementById('agType').value,desc:document.getElementById('agDesc').value.trim(),status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''});
+  document.getElementById('agTitle').value='';document.getElementById('agDesc').value='';renderAgenda();
+}
+function removeAgendaItem(id){
+  if(!isAdmin()||!confirm('Remove this item?'))return;
+  if(S.broadcastItem===id)S.broadcastItem=null;
+  S.agenda=S.agenda.filter(a=>a.id!==id);broadcast();renderAgenda();renderNow();
+}
+function moveItem(id,dir){
+  const i=S.agenda.findIndex(x=>x.id===id),j=i+dir;
+  if(j<0||j>=S.agenda.length)return;
+  [S.agenda[i],S.agenda[j]]=[S.agenda[j],S.agenda[i]];renderAgenda();
+}
+function renderAgenda(){
+  const el=document.getElementById('agendaList');
+  document.getElementById('agCount').textContent=S.agenda.length;
+  if(!S.agenda.length){el.innerHTML='<div class="empty">No agenda items.</div>';return}
+  el.innerHTML=S.agenda.map((a,i)=>`
+    <div class="agenda-card ${S.broadcastItem===a.id?'is-live':''}">
+      <div class="ag-hdr" onclick="toggleAg('agb_${a.id}',this)">
+        <span class="ag-num">${toRoman(i+1)}</span>
+        <span class="type-badge ${TYPE_BADGE[a.type]}">${TYPE_LABELS[a.type]}</span>
+        <span class="ag-title">${esc(a.title)}</span>
+        ${S.broadcastItem===a.id?'<span class="ag-status as-live">● Live</span>':a.voteOpen?'<span class="ag-status as-voting">Voting</span>':a.status==='complete'?'<span class="ag-status as-complete">Complete</span>':'<span class="ag-status as-pending">Pending</span>'}
+        <i class="ti ti-chevron-down chevron"></i>
+      </div>
+      <div class="ag-body" id="agb_${a.id}">
+        ${a.desc?`<p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;line-height:1.5;background:var(--color-background-secondary);padding:8px 12px;border-radius:var(--border-radius-md)">${esc(a.desc)}</p>`:''}
+        ${isAdmin()?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-xs" onclick="moveItem('${a.id}',-1)"><i class="ti ti-arrow-up"></i></button>
+          <button class="btn btn-xs" onclick="moveItem('${a.id}',1)"><i class="ti ti-arrow-down"></i></button>
+          <button class="btn btn-xs btn-success" onclick="goLive('${a.id}');showPanel('nowPanel',document.getElementById('tabNow'))"><i class="ti ti-radio"></i> Go live</button>
+          <button class="btn btn-xs btn-danger" onclick="removeAgendaItem('${a.id}')"><i class="ti ti-trash"></i></button>
+        </div>`:''}
+      </div>
+    </div>`).join('');
+}
+function toggleAg(bid,hdr){const b=document.getElementById(bid),c=hdr.querySelector('.chevron');const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
+function goLive(id){S.broadcastItem=id;broadcast();renderNow();renderAgenda()}
+function buildAgendaNav(currentId){
+  return`<div class="ag-nav-wrap">${S.agenda.map((ag,i)=>{
+    const isCurrent=ag.id===currentId,isDone=ag.status==='complete'&&!isCurrent;
+    const cls=isCurrent?'ag-nav-current':isDone?'ag-nav-done':'';
+    const shortTitle=ag.title.length>18?ag.title.slice(0,18)+'…':ag.title;
+    return`<button class="ag-nav-btn ${cls}" onclick="goLive('${ag.id}')" title="${esc(ag.title)}">
+      <span class="ag-nav-num">${toRoman(i+1)}</span>
+      <span class="ag-nav-label">${esc(shortTitle)}</span>
+    </button>`;
+  }).join('')}</div>`;
+}
+function renderNow(){
+  const el=document.getElementById('nowContent');
+  if(!S.currentUser){el.innerHTML='';return}
+  if(S.status==='notstarted'){
+    el.innerHTML=`<div style="text-align:center;padding:2.5rem 1rem">
+      <i class="ti ti-clock" style="font-size:36px;color:var(--color-text-secondary);display:block;margin-bottom:12px"></i>
+      <div style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Meeting has not started yet</div>
+      <div style="font-size:13px;color:var(--color-text-secondary)">${esc(fmtMtgSub())}</div>
+      ${isAdmin()?`<div style="margin-top:1.25rem">
+        <button class="btn btn-success" style="font-size:14px;padding:10px 20px" onclick="callToOrder()"><i class="ti ti-gavel"></i> Call to order</button>
+        <div style="margin-top:8px;font-size:12px;color:${quorumMet()?'#2d6a0a':'#7a4e06'}">${quorumMet()?'✓ Quorum met ('+presentCount()+' present)':'⚠ '+presentCount()+' present · quorum requires '+quorumNeeded()+' · you can still call to order'}</div>
+      </div>`:'<div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)">Waiting for the chair to call the meeting to order…</div>'}
+    </div>`;return;
+  }
+  if(S.status==='adjourned'){
+    el.innerHTML=`<div style="text-align:center;padding:2.5rem 1rem">
+      <i class="ti ti-door-exit" style="font-size:36px;color:var(--color-text-secondary);display:block;margin-bottom:12px"></i>
+      <div style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Meeting adjourned</div>
+      <div style="font-size:13px;color:var(--color-text-secondary)">Thank you for attending.<br>Next meeting: <strong>August 26, 2026</strong></div>
+    </div>`;return;
+  }
+  const a=S.agenda.find(x=>x.id===S.broadcastItem);
+  if(!a){
+    el.innerHTML=`<div style="text-align:center;padding:2rem">
+      <span class="live-badge" style="margin-bottom:12px;display:inline-flex"><span class="live-dot"></span>Meeting in progress</span>
+      <div style="font-size:13px;color:var(--color-text-secondary);margin-top:8px">Waiting for the chair to begin an agenda item…</div>
+    </div>${isAdmin()?`<div style="margin-top:1rem"><div class="sec-hd">Begin an item</div>${buildAgendaNav(null)}</div>`:''}`;return;
+  }
+  const idx=S.agenda.findIndex(x=>x.id===a.id);
+  const mid=S.currentUser.id;
+  const isVotable=a.type==='action'||a.type==='consent';
+  const moverM=S.members.find(m=>m.id===a.motioner);
+  const secondM=S.members.find(m=>m.id===a.seconder);
+  autoFillAbsentVotes(a);
+  const{yes,no,abs,absent}=voteTotals(a);
+  const present=S.members.filter(m=>!m.vacant&&isPresent(m));
+  const allIn=present.length>0&&present.every(m=>a.votes[m.id]);
+  const result=voteResult(a);
+  const progress=`<div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap">${S.agenda.map(ag=>`<div style="flex:1;min-width:18px;height:5px;border-radius:999px;background:${ag.id===a.id?'#4a9c2e':ag.status==='complete'?'#93c970':'var(--color-background-secondary)'}"></div>`).join('')}</div>`;
+  let memberActions='';
+  if(isVotable&&(a.motionOpen||a.voteOpen)){
+    const myV=a.votes[mid]||null;
+    const isMover=a.motioner===mid,isSeconder=a.seconder===mid;
+    const canMove=!a.motioner||a.motioner===mid;
+    const canSecond=!!a.motioner&&a.motioner!==mid&&(!a.seconder||a.seconder===mid);
+    memberActions=`<div class="motion-open-box" style="margin-top:12px;margin-bottom:12px">
+      <div class="motion-open-title"><i class="ti ti-speakerphone"></i> Motion</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:13px">
+        <span>Moved by: ${moverM?`<strong style="color:#1a5fb4">${esc(moverM.name)}</strong>`:'<em style="color:var(--color-text-secondary)">awaiting…</em>'}</span>
+        <span>Seconded by: ${secondM?`<strong style="color:#7209b7">${esc(secondM.name)}</strong>`:'<em style="color:var(--color-text-secondary)">awaiting…</em>'}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="motion-btn ${isMover?'sel-move':''} ${!canMove&&!isMover?'taken':''}" onclick="selfSelectMotion('${a.id}','move')" ${!canMove&&!isMover?'disabled':''}>${isMover?'✓ I moved this':'I move this motion'}</button>
+        <button class="motion-btn ${isSeconder?'sel-second':''} ${!canSecond&&!isSeconder?'taken':''}" onclick="selfSelectMotion('${a.id}','second')" ${!canSecond&&!isSeconder?'disabled':''}>${isSeconder?'✓ I seconded this':'I second this motion'}</button>
+      </div>
+    </div>`+(a.voteOpen?`<div><div class="sec-hd">Cast your vote</div>
+      ${myV&&myV!=='absent'?`<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;color:var(--color-text-secondary)">Your vote:</span><span class="vote-chip ${VOTE_CHIP_CLS[myV]}" style="font-size:13px;padding:4px 14px">${VOTE_LABELS[myV]}</span></div>`:`<div style="font-size:12px;color:#7a4e06;background:#fef0d4;border:0.5px solid #d4860a;padding:6px 12px;border-radius:var(--border-radius-md);margin-bottom:12px">Cast your vote below.</div>`}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="mvc-vb mvc-vb-yes ${myV==='yes'?'selected':''}" onclick="memberVote('${a.id}','yes')">✓ Yes</button>
+        <button class="mvc-vb mvc-vb-no ${myV==='no'?'selected':''}" onclick="memberVote('${a.id}','no')">✗ No</button>
+        <button class="mvc-vb mvc-vb-abs ${myV==='abstain'?'selected':''}" onclick="memberVote('${a.id}','abstain')">Abstain</button>
+        <button class="mvc-vb mvc-vb-absent ${myV==='absent'?'selected':''}" onclick="memberVote('${a.id}','absent')">Absent</button>
+      </div></div>`:'');
+  }
+  let chairPanel='';
+  if(isAdmin()){
+    const notesHtml=a.notes.length?a.notes.map((n,ni)=>`<div class="minute-entry"><div class="me-dot me-${n.type}"></div><div style="flex:1"><div class="me-text">${esc(n.text)}</div><div class="me-ts">${n.ts}</div></div><span style="cursor:pointer;color:var(--color-text-secondary);font-size:16px;line-height:1" onclick="removeNote('${a.id}',${ni})">×</span></div>`).join(''):'<div style="font-size:12px;color:var(--color-text-secondary);padding:4px 0">No notes yet.</div>';
+    const moverM2=S.members.find(m=>m.id===a.motioner);
+    const secondM2=S.members.find(m=>m.id===a.seconder);
+    const rollRows=present.length?present.map(m=>{
+      const v=a.votes[m.id]||null;
+      let voteCell='';
+      if(v){voteCell=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="vote-chip ${VOTE_CHIP_CLS[v]}">${VOTE_LABELS[v]}</span><button class="btn btn-xs" style="font-size:11px" onclick="clearVote('${a.id}','${m.id}')">Change</button></div>`;}
+      else{voteCell=`<div style="display:flex;gap:4px;flex-wrap:wrap"><button class="avb avb-yes" onclick="adminVote('${a.id}','${m.id}','yes')">Yes</button><button class="avb avb-no" onclick="adminVote('${a.id}','${m.id}','no')">No</button><button class="avb avb-abs" onclick="adminVote('${a.id}','${m.id}','abstain')">Abstain</button><button class="avb avb-absent" onclick="adminVote('${a.id}','${m.id}','absent')">Absent</button></div>`;}
+      return`<tr><td style="width:36%"><div style="display:flex;align-items:center;gap:6px"><div class="avatar ${m.color}" style="width:22px;height:22px;font-size:9px">${initials(m.name)}</div><span style="font-size:12px">${esc(m.name)}</span></div></td><td style="width:22%;font-size:11px;color:var(--color-text-secondary)">${esc(m.role.length>18?m.role.slice(0,18)+'…':m.role)}</td><td>${voteCell}</td></tr>`;
+    }).join(''):'<tr><td colspan="3" style="font-size:12px;color:var(--color-text-secondary);padding:8px">No members marked present.</td></tr>';
+    chairPanel=`<div class="chair-ctrl">
+      <div class="chair-ctrl-title"><i class="ti ti-gavel" style="font-size:13px"></i> Chair controls — private</div>
+      <div class="sec-hd">Agenda navigation</div>${buildAgendaNav(a.id)}
+      <div style="margin-bottom:12px"><button class="btn btn-xs ${a.status==='complete'?'btn-success':''}" onclick="markItemDone('${a.id}')">${a.status==='complete'?'✓ Item complete':'Mark item complete'}</button></div>
+      <div class="sec-hd">Private notes (not shown to members)</div>
+      <div style="margin-bottom:8px">${notesHtml}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <input type="text" id="noteInp_${a.id}" placeholder="Add private note…" style="flex:2;min-width:0;font-size:13px" onkeydown="if(event.key==='Enter')addNote('${a.id}')">
+        <select id="noteType_${a.id}" style="min-width:95px;font-size:13px"><option value="note">Note</option><option value="motion">Motion</option><option value="decision">Decision</option><option value="action">Action</option></select>
+        <button class="btn btn-primary btn-sm" onclick="addNote('${a.id}')"><i class="ti ti-plus"></i></button>
+      </div>
+      ${isVotable?`
+      <div class="sec-hd">Motion</div>
+      <div style="background:#eef4ff;border:1px solid #b8ccf5;border-radius:var(--border-radius-md);padding:10px 14px;margin-bottom:10px;font-size:13px">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+          <span>Moved by: ${moverM2?`<strong style="color:#1a5fb4">${esc(moverM2.name)}</strong>`:'<em style="color:var(--color-text-secondary)">awaiting…</em>'}</span>
+          <span>Seconded by: ${secondM2?`<strong style="color:#7209b7">${esc(secondM2.name)}</strong>`:'<em style="color:var(--color-text-secondary)">awaiting…</em>'}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <button class="btn btn-sm ${a.motionOpen?'btn-danger':'btn-success'}" onclick="toggleMotionOpen('${a.id}')">${a.motionOpen?'<i class="ti ti-lock"></i> Close motion':'<i class="ti ti-speakerphone"></i> Open motion'}</button>
+          <button class="btn btn-sm ${a.voteOpen?'btn-danger':'btn-success'}" onclick="toggleVoteOpen('${a.id}')">${a.voteOpen?'<i class="ti ti-lock"></i> Close voting':'<i class="ti ti-lock-open"></i> Open voting'}</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px">Override: Moved by</label><select style="width:100%;font-size:12px" onchange="setMotioner('${a.id}',this.value)"><option value="">— clear —</option>${present.map(m=>`<option value="${m.id}" ${a.motioner===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div>
+          <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px">Override: Seconded by</label><select style="width:100%;font-size:12px" onchange="setSeconder('${a.id}',this.value)"><option value="">— clear —</option>${present.map(m=>`<option value="${m.id}" ${a.seconder===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div>
+        </div>
+      </div>
+      <div class="sec-hd">Roll call</div>
+      <div class="tally-result-row">
+        <span class="tally t-yes">Yes: ${yes}</span><span class="tally t-no">No: ${no}</span>
+        ${abs?`<span class="tally t-abs">Abstain: ${abs}</span>`:''}
+        ${absent?`<span class="tally t-absent">Absent: ${absent}</span>`:''}
+        <span class="tally-divider"></span>${resultInlineBadge(result,!allIn)}
+      </div>
+      <table class="vote-roll"><thead><tr><th>Member</th><th>Role</th><th>Vote</th></tr></thead><tbody>${rollRows}</tbody></table>`:''}
+    </div>`;
+  }
+  el.innerHTML=`${progress}<div class="current-item-card">
+    <div class="ci-header"><span class="ci-num">${toRoman(idx+1)}</span><span class="ci-header-text">Now discussing</span><span class="live-badge" style="background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.3)"><span class="live-dot" style="background:#fff"></span>LIVE</span></div>
+    <div class="ci-body">
+      <div class="ci-title">${esc(a.title)}</div>
+      ${a.desc?`<div class="ci-desc">${esc(a.desc)}</div>`:''}
+      <span class="type-badge ${TYPE_BADGE[a.type]}">${TYPE_LABELS[a.type]}</span>
+      ${a.status==='complete'?'<span class="ag-status as-complete" style="margin-left:6px">Complete</span>':a.voteOpen?'<span class="ag-status as-voting" style="margin-left:6px">Voting open</span>':a.motionOpen?'<span class="ag-status as-motion" style="margin-left:6px">Motion open</span>':''}
+      ${memberActions}
+    </div>
+  </div>${chairPanel}`;
+}
+function toggleMotionOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.motionOpen=!a.motionOpen;if(a.motionOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Motion period '+(a.motionOpen?'opened.':'closed.'),'note');broadcast();renderNow();renderAgenda()}
+function toggleVoteOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.voteOpen=!a.voteOpen;if(a.voteOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Voting '+(a.voteOpen?'opened.':'closed.'),'note');broadcast();renderNow();renderAgenda()}
+function setMotioner(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.motioner=mid;broadcast();renderNow()}
+function setSeconder(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.seconder=mid;broadcast();renderNow()}
+function selfSelectMotion(aid,role){
+  const a=S.agenda.find(x=>x.id===aid);if(!a||!S.currentUser)return;
+  const mid=S.currentUser.id;
+  if(role==='move'){if(a.motioner===mid){a.motioner=''}else if(!a.motioner){a.motioner=mid}else return}
+  else{if(!a.motioner||a.motioner===mid)return;if(a.seconder===mid){a.seconder=''}else if(!a.seconder){a.seconder=mid}else return}
+  if(a.motioner&&a.seconder){
+    addMinute('['+a.title+'] Motion moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Voting closed automatically.','note');
+    autoCloseVoting(a);
+  }
+  broadcast();renderNow();renderAgenda();renderMinutes();
+}
+function memberVote(aid,choice){
+  if(!S.currentUser)return;
+  const a=S.agenda.find(x=>x.id===aid);if(!a||!a.voteOpen)return;
+  a.votes[S.currentUser.id]=a.votes[S.currentUser.id]===choice?null:choice;
+  broadcast();renderNow();
+}
+function adminVote(aid,mid,choice){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.votes[mid]=choice;broadcast();renderNow()}
+function clearVote(aid,mid){
+  const a=S.agenda.find(x=>x.id===aid);if(!a)return;
+  const m=S.members.find(x=>x.id===mid);
+  a.votes[mid]=m&&!isPresent(m)?'absent':null;broadcast();renderNow();
+}
+function markItemDone(id){
+  const a=S.agenda.find(x=>x.id===id);if(!a)return;
+  if(a.status==='complete'){a.status='active';broadcast();renderAgenda();renderNow();return}
+  autoCloseVoting(a);broadcast();renderAgenda();renderMinutes();renderNow();
+}
+function addNote(id){
+  const a=S.agenda.find(x=>x.id===id);if(!a)return;
+  const inp=document.getElementById('noteInp_'+id);if(!inp)return;
+  const txt=inp.value.trim();if(!txt)return;
+  const type=(document.getElementById('noteType_'+id)||{}).value||'note';
+  a.notes.push({text:txt,type,ts:ts()});inp.value='';
+  addMinute('['+a.title+'] '+txt,type);broadcast();renderNow();renderMinutes();
+}
+function removeNote(aid,idx){const a=S.agenda.find(x=>x.id===aid);if(a){a.notes.splice(idx,1);broadcast();renderNow()}}
+function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
+function renderMinutes(){
+  const el=document.getElementById('minutesList');
+  if(!S.minutes.length){el.innerHTML='<div class="empty">Minutes appear here as the meeting progresses.</div>';return}
+  const dotMap={note:'me-note',motion:'me-motion',decision:'me-decision',action:'me-action'};
+  el.innerHTML=S.minutes.map(m=>`<div class="minute-entry"><div class="me-dot ${dotMap[m.type]||'me-note'}"></div><div style="flex:1"><div class="me-text">${esc(m.text)}</div><div class="me-ts">${m.ts}</div></div></div>`).join('');
+}
+function buildReport(){
+  const sub=fmtMtgSub();
+  const lines=['═══════════════════════════════════════════════════════',
+    '  '+S.mtg.name.toUpperCase(),'  ANTELOPE VALLEY COLLEGE — MINUTES & VOTE REPORT','  '+sub,
+    '═══════════════════════════════════════════════════════','',
+    'PRESENT:',...S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>'  '+padR(m.role,34)+m.name+(m.attendance==='override'?' [manual]':'')),
+    '','ABSENT:',...S.members.filter(m=>!m.vacant&&!isPresent(m)).map(m=>'  '+padR(m.role,34)+m.name),
+    '','VACANT:',...S.members.filter(m=>m.vacant).map(m=>'  '+m.role),
+    '','AGENDA',...S.agenda.map((a,i)=>'  '+padR(toRoman(i+1)+'.',5)+'['+TYPE_LABELS[a.type]+']  '+a.title),
+    '','RECORD',...S.minutes.map(m=>'  '+padR(m.ts,8)+m.text),''];
+  const voted=S.agenda.filter(a=>a.type==='action'||a.type==='consent');
+  if(voted.length){lines.push('VOTE DETAIL','');voted.forEach(a=>{
+    autoFillAbsentVotes(a);
+    const present=S.members.filter(m=>!m.vacant&&isPresent(m));
+    const mover=S.members.find(m=>m.id===a.motioner),second=S.members.find(m=>m.id===a.seconder);
+    const{yes,no,abs,absent}=voteTotals(a);
+    const res=a.status==='complete'?(yes>no?'PASSED':no>yes?'FAILED':'FAILED (TIED)'):'PENDING';
+    lines.push('  Item: '+a.title);if(mover)lines.push('  Moved by:    '+mover.name);if(second)lines.push('  Seconded by: '+second.name);
+    lines.push('  Result:      '+res+' (Yes: '+yes+', No: '+no+(abs?', Abstain: '+abs:'')+(absent?', Absent: '+absent:'')+')','  Roll call:');
+    S.members.filter(m=>!m.vacant).forEach(m=>lines.push('    '+padR(m.name,30)+(a.votes[m.id]?VOTE_LABELS[a.votes[m.id]]:'—')));lines.push('');
+  });}
+  lines.push('Next meeting: August 26, 2026','═══════════════════════════════════════════════════════');
+  return lines.join('\n');
+}
+function saveToArchive(){
+  const text=buildReport();
+  const d=new Date(S.mtg.date+'T12:00:00');
+  const label=d.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})+' — '+S.mtg.name;
+  const idx=S.archive.findIndex(a=>a.label===label);
+  const entry={id:uid(),label,date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
+  if(idx>=0){if(!confirm('Overwrite existing record?'))return;S.archive[idx]=entry;}else S.archive.unshift(entry);
+  try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}
+  renderPastMinutes();const b=document.getElementById('saveBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),3000);
+}
+function uploadMinutes(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>{
+    const text=ev.target.result;
+    const m=text.split('\n').slice(0,6).join(' ').match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}/i);
+    const dateStr=m?m[0]:'Unknown date';
+    S.archive.unshift({id:uid(),label:dateStr+' — FPD Committee',date:dateStr,savedAt:new Date().toLocaleString(),text,uploaded:true});
+    try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}
+    renderPastMinutes();e.target.value='';
+  };r.readAsText(f);
+}
+function clearArchive(){if(!confirm('Clear all past minutes?'))return;S.archive=[];try{localStorage.removeItem('fpd_archive_v5')}catch(e){}renderPastMinutes()}
+function deleteArchiveItem(){const id=document.getElementById('archiveSelect').value;if(!id)return;if(!confirm('Delete?'))return;S.archive=S.archive.filter(a=>a.id!==id);try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}renderPastMinutes()}
+function viewArchiveItem(){
+  const id=document.getElementById('archiveSelect').value;
+  document.getElementById('deleteArchiveBtn').style.display=id?'inline-flex':'none';
+  document.querySelectorAll('.past-body').forEach(b=>b.style.display='none');
+  if(id){const body=document.getElementById('pb_'+id),chev=document.getElementById('pc_'+id);if(body){body.style.display='block';if(chev)chev.classList.add('open')}
+    setTimeout(()=>{const el=document.getElementById('pcard_'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},50);}
+}
+function renderPastMinutes(){
+  const el=document.getElementById('pastList'),wrap=document.getElementById('archiveDropdownWrap'),sel=document.getElementById('archiveSelect');
+  sel.innerHTML='<option value="">— select —</option>';
+  S.archive.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.label+(a.uploaded?' [uploaded]':'');sel.appendChild(o)});
+  wrap.style.display=S.archive.length?'block':'none';document.getElementById('deleteArchiveBtn').style.display='none';
+  if(!S.archive.length){el.innerHTML=`<div class="empty" style="padding:2rem 0"><i class="ti ti-archive" style="font-size:28px;color:var(--color-text-secondary);display:block;margin-bottom:8px"></i>No past minutes yet.</div>`;return}
+  el.innerHTML=S.archive.map(a=>`<div class="past-card" id="pcard_${a.id}">
+    <div class="past-hdr" onclick="togglePast('${a.id}')">
+      <span class="past-date-badge">${esc(a.date)}</span>
+      <span class="past-title">${esc(a.label)}</span>
+      <span class="past-meta">${a.uploaded?'Uploaded':'Saved'} · ${esc(a.savedAt)}</span>
+      <i class="ti ti-chevron-down chevron" id="pc_${a.id}"></i>
+    </div>
+    <div class="past-body" id="pb_${a.id}">
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="dlArchive('${a.id}')"><i class="ti ti-download"></i> Download</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteOne('${a.id}')"><i class="ti ti-trash"></i> Delete</button>
+      </div>
+      <div class="past-text">${esc(a.text)}</div>
+    </div>
+  </div>`).join('');
+}
+function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
+function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,50)+'.txt',a.text)}
+function deleteOne(id){if(!confirm('Delete?'))return;S.archive=S.archive.filter(a=>a.id!==id);try{localStorage.setItem('fpd_archive_v5',JSON.stringify(S.archive))}catch(e){}renderPastMinutes()}
+function exportTxt(){dl((S.mtg.name+'_'+S.mtg.date).replace(/[^a-z0-9]/gi,'_')+'.txt',buildReport())}
+function dl(name,text){const blob=new Blob([text],{type:'text/plain'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click()}
+function draftFormal(){
+  const present=S.members.filter(m=>!m.vacant&&isPresent(m)).map(m=>m.role+' '+m.name).join(', ');
+  alert('Copy this prompt into Claude:\n\nDraft formal meeting minutes for '+S.mtg.name+', Antelope Valley College. Date: '+fmtMtgSub()+'. Members present: '+present+'. Record: '+S.minutes.map(m=>m.text).join(' | ')+'. Next meeting: August 26, 2026.');
+}
+</script>
+</body>
+</html>
