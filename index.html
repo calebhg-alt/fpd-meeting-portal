@@ -321,7 +321,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div class="nav-tab" onclick="showPanel('rosterPanel',this)"><i class="ti ti-users"></i> Roster</div>
     <div class="nav-tab" onclick="showPanel('agendaPanel',this)"><i class="ti ti-list"></i> Agenda</div>
     <div class="nav-tab" id="minutesTab" style="display:none" onclick="showPanel('minutesPanel',this)"><i class="ti ti-notes"></i> Minutes</div>
-    <div class="nav-tab" id="calendarTab" style="display:none" onclick="showPanel('calendarPanel',this)"><i class="ti ti-calendar"></i> Calendar</div>
+    <div class="nav-tab" id="calendarTab" style="display:none" onclick="showPanel('calendarPanel',this)" id="calTab"><i class="ti ti-calendar"></i> Calendar</div>
     <div class="nav-tab" onclick="showPanel('pastPanel',this)"><i class="ti ti-archive"></i> Past</div>
   </div>
 
@@ -407,6 +407,34 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
       <button class="btn btn-xs" id="flt-agenda" onclick="filterPast('agenda',this)">Agendas</button>
     </div>
     <div id="pastList"></div>
+  </div>
+</div>
+
+
+<!-- FUTURE AGENDA MODAL -->
+<div class="modal-overlay" id="futureAgendaModal">
+  <div class="modal" style="width:500px;max-width:96%">
+    <h3><i class="ti ti-list" style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Future meeting agenda — <span id="futModalDateLabel"></span></h3>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:14px">The 4 standard items (Approval of Agenda, Opening Comments, Public Comment, Approval of Previous Minutes) always auto-populate first. Manage additional items below.</p>
+    <div id="futModalList" style="margin-bottom:12px;min-height:40px"></div>
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px">
+      <div class="sec-hd" style="margin-bottom:8px">Add item</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <input type="text" id="futNewTitle" placeholder="Item title" style="flex:2;min-width:120px;font-size:13px" onkeydown="if(event.key==='Enter')addFutureItemModal()">
+        <select id="futNewType" style="min-width:130px;font-size:13px">
+          <option value="discussion">Discussion</option>
+          <option value="action">Action item</option>
+          <option value="consent">Consent</option>
+          <option value="info">Informational</option>
+          <option value="public">Public comment</option>
+        </select>
+      </div>
+      <textarea id="futNewDesc" placeholder="Description (optional)" style="width:100%;font-size:12px;resize:vertical;min-height:40px;font-family:var(--font-sans)"></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="addFutureItemModal()"><i class="ti ti-plus"></i> Add item</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeFutureAgendaModal()">Done</button>
+    </div>
   </div>
 </div>
 
@@ -540,6 +568,8 @@ CALENDAR_REF.on('value',snap=>{
 FUTURE_REF.on('value',snap=>{
   S.futureAgendas=snap.val()||{};
   if(document.getElementById('calendarPanel')?.classList.contains('active'))renderCalendar();
+  if(document.getElementById('futureAgendaModal')?.classList.contains('open'))renderFutureAgendaModal();
+  if(S.status==='adjourned'&&S.currentUser)renderNow();
 });
 
 db.ref('.info/connected').on('value',snap=>{
@@ -1135,23 +1165,46 @@ function renderNow(){
 
   if(S.status==='adjourned'){
     const next=getNextMeeting();
-    el.innerHTML=`<div style="text-align:center;padding:2.5rem 1rem">
-      <i class="ti ti-flag-check" style="font-size:36px;color:#4E9BAD;display:block;margin-bottom:12px"></i>
-      <div style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Meeting adjourned</div>
-      <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${esc(fmtDateShort(S.mtg.date))}</div>
+    // build future agenda preview for admin
+    let futureAgendaHtml='';
+    if(isAdmin()&&next){
+      const dateKey=next.date.replace(/-/g,'');
+      const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
+      futureAgendaHtml=`<div style="margin-top:20px;text-align:left;max-width:460px;margin-left:auto;margin-right:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="sec-hd" style="margin-bottom:0">Pre-set agenda for ${esc(fmtDateShort(next.date))}</div>
+          <button class="btn btn-xs btn-primary" onclick="openFutureAgendaModal('${dateKey}')"><i class="ti ti-edit"></i> Edit</button>
+        </div>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Standard items (I–V) auto-populate. Items below are added after:</div>
+        ${futItems.length?futItems.map((fi,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:5px;font-size:13px">
+          <span style="font-size:11px;font-weight:600;color:var(--color-text-secondary);min-width:20px">${i+6}.</span>
+          <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
+          <span style="flex:1">${esc(fi.title)}</span>
+        </div>`).join(''):`<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0;font-style:italic">No additional items yet. Click Edit to add.</div>`}
+      </div>`;
+    }
+    el.innerHTML=`<div style="padding:2rem 0.5rem">
+      <div style="text-align:center;margin-bottom:20px">
+        <i class="ti ti-door-exit" style="font-size:32px;color:var(--color-text-secondary);display:block;margin-bottom:8px"></i>
+        <div style="font-size:14px;font-weight:500;color:var(--color-text-primary)">Meeting adjourned</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(fmtDateShort(S.mtg.date))}</div>
+      </div>
       ${next?`
-      <div style="background:#d6edf2;border:1px solid #4E9BAD;border-radius:var(--border-radius-lg);padding:14px 20px;margin-bottom:16px;display:inline-block;text-align:left">
-        <div style="font-size:12px;color:#2a6e80;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Next meeting</div>
-        <div style="font-size:15px;font-weight:600;color:#1e3840">${esc(fmtDateShort(next.date))}</div>
-        <div style="font-size:13px;color:#2a6e80">${next.start?next.start+' – '+(next.end||''):''}${next.loc?' · '+esc(next.loc):''}</div>
-      </div>
-      ${isAdmin()?`<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="advanceToNextMeeting()">
-          <i class="ti ti-arrow-right"></i> Advance to next meeting
-        </button>
-      </div>
-      <div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)">This will load the agenda for ${esc(fmtDateShort(next.date))}. You can call to order at any time.</div>`:''}`
-      :'<div style="font-size:13px;color:var(--color-text-secondary)">No future meetings scheduled.<br>Add dates in the <strong>Calendar</strong> tab.</div>'}
+      <div style="background:#d6edf2;border:1.5px solid #4E9BAD;border-radius:var(--border-radius-lg);padding:16px 20px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#2a6e80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px"><i class="ti ti-calendar-event" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Next meeting</div>
+        <div style="font-size:17px;font-weight:700;color:#1e3840;margin-bottom:4px">${esc(fmtDateShort(next.date))}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#2a6e80">
+          ${next.start?`<span><i class="ti ti-clock" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${next.start}${next.end?' – '+next.end:''}</span>`:''}
+          ${next.loc?`<span><i class="ti ti-map-pin" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${esc(next.loc)}</span>`:''}
+        </div>
+        ${isAdmin()?`<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(78,155,173,.3);display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button>
+        </div>`:''}</div>
+      ${futureAgendaHtml}`
+      :`<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
+        <div style="font-size:13px;color:var(--color-text-secondary)">No future meetings scheduled.</div>
+        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel('calendarPanel',document.getElementById('calTab'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
+      </div>`}
     </div>`;return;
   }
 
@@ -1287,7 +1340,6 @@ function advanceToNextMeeting(){
     {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
     {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
     {id:'a04',title:'Approval of Previous Minutes — '+prevLabel,type:'action',desc:'Motion to approve the minutes from the '+prevLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
-    {id:'a05',title:'FEP Reports',type:'discussion',desc:'Discussion of Faculty Enrichment Program reports.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:''},
     ...carryItems,...futureItems
   ];
   S.mtg={name:S.mtg.name,date:next.date,start:next.start||S.mtg.start,end:next.end||S.mtg.end,loc:next.loc||S.mtg.loc};
@@ -1298,6 +1350,84 @@ function advanceToNextMeeting(){
   pushToFirebase();
   updateBannerText();updateBanner();renderRoster();renderAgenda();renderMinutes();renderNow();
   showPanel('nowPanel',document.getElementById('tabNow'));
+}
+
+
+// ── Future Agenda Modal ──
+let _futModalDateKey='';
+function openFutureAgendaModal(dateKey){
+  _futModalDateKey=dateKey;
+  // format date for label
+  const dateStr=dateKey.slice(0,4)+'-'+dateKey.slice(4,6)+'-'+dateKey.slice(6,8);
+  document.getElementById('futModalDateLabel').textContent=fmtDateShort(dateStr);
+  document.getElementById('futNewTitle').value='';
+  document.getElementById('futNewDesc').value='';
+  renderFutureAgendaModal();
+  document.getElementById('futureAgendaModal').classList.add('open');
+}
+function closeFutureAgendaModal(){
+  document.getElementById('futureAgendaModal').classList.remove('open');
+  // refresh calendar and now panel
+  renderCalendar();
+  if(S.status==='adjourned')renderNow();
+}
+document.getElementById('futureAgendaModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeFutureAgendaModal()});
+
+function renderFutureAgendaModal(){
+  const el=document.getElementById('futModalList');
+  const items=S.futureAgendas[_futModalDateKey]?Object.values(S.futureAgendas[_futModalDateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
+  if(!items.length){el.innerHTML='<div style="font-size:13px;color:var(--color-text-secondary);padding:8px 0;font-style:italic">No additional items yet.</div>';return}
+  el.innerHTML=items.map((fi,i)=>`
+    <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 12px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${TYPE_LABELS[fi.type]||'Discussion'}</span>
+            <span style="font-size:13px;font-weight:500">${esc(fi.title)}</span>
+          </div>
+          ${fi.desc?`<div style="font-size:12px;color:var(--color-text-secondary)">${esc(fi.desc)}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button class="btn btn-xs" onclick="editFutureItem('${_futModalDateKey}','${fi.id}')" title="Edit"><i class="ti ti-edit" style="font-size:12px"></i></button>
+          <button class="btn btn-xs" onclick="moveFutureItem('${_futModalDateKey}','${fi.id}',-1)" ${i===0?'disabled':''} title="Move up"><i class="ti ti-arrow-up" style="font-size:12px"></i></button>
+          <button class="btn btn-xs" onclick="moveFutureItem('${_futModalDateKey}','${fi.id}',1)" ${i===items.length-1?'disabled':''} title="Move down"><i class="ti ti-arrow-down" style="font-size:12px"></i></button>
+          <button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="removeFutureItem('${_futModalDateKey}','${fi.id}')" title="Remove"><i class="ti ti-trash" style="font-size:12px"></i></button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addFutureItemModal(){
+  const title=document.getElementById('futNewTitle').value.trim();if(!title)return;
+  const type=document.getElementById('futNewType').value;
+  const desc=document.getElementById('futNewDesc').value.trim();
+  const items=S.futureAgendas[_futModalDateKey]?Object.values(S.futureAgendas[_futModalDateKey]):[];
+  const order=items.length;
+  const id='fi_'+uid();
+  FUTURE_REF.child(_futModalDateKey).child(id).set({id,title,type,desc,order}).then(()=>{
+    document.getElementById('futNewTitle').value='';
+    document.getElementById('futNewDesc').value='';
+  });
+}
+
+function editFutureItem(dateKey,id){
+  const items=S.futureAgendas[dateKey];if(!items)return;
+  const fi=items[id];if(!fi)return;
+  const newTitle=prompt('Edit item title:',fi.title);
+  if(newTitle===null)return;
+  const newDesc=prompt('Edit description (optional):',fi.desc||'');
+  FUTURE_REF.child(dateKey).child(id).update({title:newTitle.trim()||fi.title,desc:newDesc||''});
+}
+
+function moveFutureItem(dateKey,id,dir){
+  const items=Object.values(S.futureAgendas[dateKey]||{}).sort((a,b)=>(a.order||0)-(b.order||0));
+  const idx=items.findIndex(x=>x.id===id);
+  const swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=items.length)return;
+  const updates={};
+  updates[items[idx].id+'/order']=swapIdx;
+  updates[items[swapIdx].id+'/order']=idx;
+  FUTURE_REF.child(dateKey).update(updates);
 }
 
 // ── Vote actions ──
