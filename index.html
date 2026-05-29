@@ -312,6 +312,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
         <span style="font-size:12px" id="userNameBanner"></span>
       </div>
       <button class="btn btn-sm" id="settingsBtn" style="display:none" onclick="openSettings()" title="Meeting details"><i class="ti ti-settings"></i></button>
+      <button class="btn btn-sm btn-warn" id="concludeBtn" style="display:none" onclick="concludeMeeting()" title="Conclude &amp; advance to next meeting"><i class="ti ti-flag-check"></i> Conclude</button>
       <button class="btn btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i></button>
     </div>
   </div>
@@ -345,7 +346,6 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-success" id="callOrderBtn" onclick="callToOrder()" style="display:none"><i class="ti ti-gavel"></i> Call to order</button>
       <button class="btn btn-danger" id="adjournBtn" onclick="adjourn()" style="display:none"><i class="ti ti-door-exit"></i> Adjourn</button>
-      <button class="btn btn-warn" id="concludeBtn" onclick="concludeMeeting()" style="display:none"><i class="ti ti-flag-check"></i> Conclude &amp; advance</button>
     </div>
   </div>
 
@@ -1137,6 +1137,7 @@ function renderAgenda(){
       <div class="ag-body" id="agb_${a.id}">
         ${a.desc?`<p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;line-height:1.5;background:var(--color-background-secondary);padding:8px 12px;border-radius:var(--border-radius-md)">${esc(a.desc)}</p>`:''}
         ${a.carried?'<p style="font-size:12px;color:#944d0e;background:#fdf0e6;padding:5px 10px;border-radius:var(--border-radius-md);margin-bottom:8px"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Carried forward from previous meeting</p>':''}
+        ${isAdmin()&&a.notes&&a.notes.length?`<div style="margin-bottom:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:8px"><div class="sec-hd" style="margin-bottom:6px">Minutes</div>${a.notes.map(n=>'<div class="minute-entry" style="padding:4px 0"><div class="me-dot me-'+n.type+'"></div><div style="flex:1"><div class="me-text">'+esc(n.text)+'</div><div class="me-ts">'+n.ts+'</div></div></div>').join('')}</div>`:''}
         ${isAdmin()?`<div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-xs" onclick="moveItem('${a.id}',-1)"><i class="ti ti-arrow-up"></i></button>
           <button class="btn btn-xs" onclick="moveItem('${a.id}',1)"><i class="ti ti-arrow-down"></i></button>
@@ -1289,14 +1290,13 @@ function renderNow(){
     chairPanel=`<div class="chair-ctrl">
       <div class="chair-ctrl-title"><i class="ti ti-gavel" style="font-size:13px"></i> Chair controls — private</div>
       <div class="sec-hd">Agenda navigation</div>${buildAgendaNav(a.id)}
-      <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
+      <div style="margin-bottom:12px">
         <button class="btn btn-xs ${a.status==='complete'?'btn-success':''}" onclick="markItemDone('${a.id}')">${a.status==='complete'?'✓ Item complete':'Mark item complete'}</button>
-        <button class="btn btn-xs btn-warn" onclick="concludeMeeting()"><i class="ti ti-flag-check"></i> Conclude meeting</button>
       </div>
-      <div class="sec-hd">Private notes (not shown to members)</div>
+      <div class="sec-hd">Minutes</div>
       <div style="margin-bottom:8px">${notesHtml}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        <input type="text" id="noteInp_${a.id}" placeholder="Add private note…" style="flex:2;min-width:0;font-size:13px" onkeydown="if(event.key==='Enter')addNote('${a.id}')">
+        <input type="text" id="noteInp_${a.id}" placeholder="Add minute…" style="flex:2;min-width:0;font-size:13px" onkeydown="if(event.key==='Enter')addNote('${a.id}')">
         <select id="noteType_${a.id}" style="min-width:95px;font-size:13px"><option value="note">Note</option><option value="motion">Motion</option><option value="decision">Decision</option><option value="action">Action</option></select>
         <button class="btn btn-primary btn-sm" onclick="addNote('${a.id}')"><i class="ti ti-plus"></i></button>
       </div>
@@ -1454,7 +1454,24 @@ function moveFutureItem(dateKey,id,dir){
 
 // ── Vote actions ──
 function toggleMotionOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.motionOpen=!a.motionOpen;if(a.motionOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Motion '+(a.motionOpen?'opened.':'closed.'),'note');pushToFirebase();renderNow();renderAgenda()}
-function toggleVoteOpen(id){const a=S.agenda.find(x=>x.id===id);if(!a)return;a.voteOpen=!a.voteOpen;if(a.voteOpen)autoFillAbsentVotes(a);addMinute('['+a.title+'] Voting '+(a.voteOpen?'opened.':'closed.'),'note');pushToFirebase();renderNow();renderAgenda()}
+function toggleVoteOpen(id){
+  const a=S.agenda.find(x=>x.id===id);if(!a)return;
+  const wasOpen=a.voteOpen;
+  a.voteOpen=!a.voteOpen;
+  if(a.voteOpen){autoFillAbsentVotes(a);}
+  addMinute('['+a.title+'] Voting '+(a.voteOpen?'opened.':'closed.'),'note');
+  // Notify all participants when voting closes
+  if(wasOpen&&!a.voteOpen){
+    autoFillAbsentVotes(a);
+    const{yes,no,abs}=voteTotals(a);
+    const result=voteResult(a);
+    const n={id:'notif_'+Date.now(),itemTitle:a.title,result,yes,no,abs,ts:ts()};
+    S.lastNotifId=n.id;
+    if(_fbAvailable&&NOTIF_REF)NOTIF_REF.set(n);
+    showToast(n);
+  }
+  pushToFirebase();renderNow();renderAgenda();
+}
 function setMotioner(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.motioner=mid;pushToFirebase();renderNow()}
 function setSeconder(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.seconder=mid;pushToFirebase();renderNow()}
 function selfSelectMotion(aid,role){
