@@ -399,6 +399,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
         <button class="btn btn-sm" onclick="document.getElementById('uploadFile').click()"><i class="ti ti-upload"></i> Upload (.txt)</button>
         <input type="file" id="uploadFile" accept=".txt,.md" style="display:none" onchange="uploadMinutes(event)">
 <input type="file" id="agendaFileInput" style="display:none" onchange="handleAgendaFileUpload(event)">
+<input type="file" id="futureFileInput" style="display:none" onchange="handleFutureFileUpload(event)">
         <button class="btn btn-sm" id="clearArchiveBtn" style="display:none;color:var(--color-text-danger)" onclick="clearArchive()"><i class="ti ti-trash"></i> Clear all</button>
       </div>
     </div>
@@ -522,14 +523,12 @@ const S={
   mtg:{name:'Faculty Professional Development Committee',date:'2026-05-27',start:'14:30',end:'16:00',loc:'L201 / Zoom'}
 };
 
-let _ignoreNextSync=false;
 const _DEVICE_ID='dev_'+Math.random().toString(36).slice(2,10);
 let _lastPushId=null;
 
 // ── Firebase sync ──
 function pushToFirebase(){
   if(!_fbAvailable||!SYNC_REF)return;
-  _ignoreNextSync=true;
   _lastPushId=_DEVICE_ID+'_'+Date.now();
   const payload={
     status:S.status,broadcastItem:S.broadcastItem||null,mtg:S.mtg,
@@ -561,9 +560,8 @@ function applyFirebaseData(d){
 if(_fbAvailable){
   SYNC_REF.on('value',snap=>{
     const d=snap.val();if(!d)return;
-    // Skip ALL callbacks from our own device — we already have the data locally
+    // Skip pushes from our own device — we already have the data locally
     if(d.pushedBy&&d.pushedBy.startsWith(_DEVICE_ID)){return;}
-    if(_ignoreNextSync){_ignoreNextSync=false;return;}
     applyFirebaseData(d);
     if(S.currentUser)refreshAll();
   });
@@ -1178,17 +1176,29 @@ function renderNow(){
 
   if(S.status==='notstarted'){
     const next=getNextMeeting();
-    el.innerHTML=`<div style="text-align:center;padding:2.5rem 1rem">
-      <i class="ti ti-clock" style="font-size:36px;color:var(--color-text-secondary);display:block;margin-bottom:12px"></i>
-      <div style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Meeting has not started yet</div>
-      <div style="font-size:13px;color:var(--color-text-secondary)">${esc(fmtMtgSub())}</div>
-      ${isAdmin()?`<div style="margin-top:1.25rem">
-        <button class="btn btn-success" style="font-size:14px;padding:10px 20px" onclick="callToOrder()"><i class="ti ti-gavel"></i> Call to order</button>
-        <div style="margin-top:8px;font-size:12px;color:${quorumMet()?'#1e5e6e':'#944d0e'}">${quorumMet()?'✓ Quorum met ('+presentCount()+' present)':'⚠ '+presentCount()+' present · quorum requires '+quorumNeeded()}</div>
+    // Current meeting card
+    const currentCard=`<div style="background:#d6edf2;border:1.5px solid #4E9BAD;border-radius:var(--border-radius-lg);padding:16px 20px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#2a6e80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px"><i class="ti ti-calendar-event" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Upcoming meeting</div>
+      <div style="font-size:17px;font-weight:700;color:#1e3840;margin-bottom:4px">${esc(fmtDateShort(S.mtg.date))}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#2a6e80">
+        ${S.mtg.start?`<span><i class="ti ti-clock" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${S.mtg.start}${S.mtg.end?' – '+S.mtg.end:''}</span>`:''}
+        ${S.mtg.loc?`<span><i class="ti ti-map-pin" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${esc(S.mtg.loc)}</span>`:''}
       </div>
-      ${next?`<div style="margin-top:14px;font-size:12px;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:8px 14px;border-radius:var(--border-radius-md);display:inline-block">Next meeting after this: <strong>${esc(fmtDateShort(next.date))}</strong></div>`:''}`
-      :'<div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)">Waiting for the chair to call the meeting to order…</div>'}
-    </div>`;return;
+      ${isAdmin()?`<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(78,155,173,.3);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="callToOrder()"><i class="ti ti-gavel"></i> Call to order</button>
+        <span style="font-size:12px;color:${quorumMet()?'#1e5e6e':'#944d0e'}">${quorumMet()?'✓ Quorum met ('+presentCount()+' present)':'⚠ '+presentCount()+' present · need '+quorumNeeded()+' for quorum'}</span>
+      </div>`:'<div style="margin-top:10px;font-size:12px;color:#2a6e80">Waiting for the chair to call the meeting to order…</div>'}
+    </div>`;
+    // Next meeting card (for all users)
+    const nextCard=next?`<div style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 18px">
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Following meeting</div>
+      <div style="font-size:15px;font-weight:600;color:var(--color-text-primary);margin-bottom:3px">${esc(fmtDateShort(next.date))}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--color-text-secondary)">
+        ${next.start?`<span><i class="ti ti-clock" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${next.start}${next.end?' – '+next.end:''}</span>`:''}
+        ${next.loc?`<span><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${esc(next.loc)}</span>`:''}
+      </div>
+    </div>`:'';
+    el.innerHTML=`<div style="padding:1rem 0">${currentCard}${nextCard}</div>`;return;
   }
 
   if(S.status==='adjourned'){
@@ -1413,7 +1423,9 @@ function renderFutureAgendaModal(){
             <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${TYPE_LABELS[fi.type]||'Discussion'}</span>
             <span style="font-size:13px;font-weight:500">${esc(fi.title)}</span>
           </div>
-          ${fi.desc?`<div style="font-size:12px;color:var(--color-text-secondary)">${esc(fi.desc)}</div>`:''}
+          ${fi.desc?`<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">${esc(fi.desc)}</div>`:''}
+          ${fi.attachments&&fi.attachments.length?`<div>${fi.attachments.map((f,fIdx)=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 6px;background:var(--color-background-secondary);border-radius:4px;margin-bottom:3px"><i class="ti ti-file" style="color:#2a6e80;font-size:11px"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--color-text-secondary)">${(f.size/1024).toFixed(0)}KB</span><button class="btn btn-xs" onclick="downloadFutureAttachment('${_futModalDateKey}','${fi.id}',${fIdx})"><i class="ti ti-download" style="font-size:10px"></i></button><button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="removeFutureAttachment('${_futModalDateKey}','${fi.id}',${fIdx})"><i class="ti ti-trash" style="font-size:10px"></i></button></div>`).join('')}</div>`:''}
+          <button class="btn btn-xs" style="margin-top:4px" onclick="triggerFutureFileUpload('${_futModalDateKey}','${fi.id}')"><i class="ti ti-paperclip" style="font-size:11px"></i> Attach file</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
           <button class="btn btn-xs" onclick="editFutureItem('${_futModalDateKey}','${fi.id}')" title="Edit"><i class="ti ti-edit" style="font-size:12px"></i></button>
@@ -1494,6 +1506,41 @@ function removeAttachment(agendaId, idx){
   const a = S.agenda.find(x=>x.id===agendaId); if(!a||!a.attachments)return;
   a.attachments.splice(idx,1);
   pushToFirebase();renderAgenda();renderNow();
+}
+
+
+// ── Future Agenda Attachments ──
+let _futAttachDateKey='', _futAttachItemId='';
+function triggerFutureFileUpload(dateKey, itemId){
+  _futAttachDateKey=dateKey; _futAttachItemId=itemId;
+  const inp=document.getElementById('futureFileInput');
+  inp.value=''; inp.click();
+}
+function handleFutureFileUpload(e){
+  const f=e.target.files[0]; if(!f||!_futAttachDateKey||!_futAttachItemId)return;
+  if(f.size>3*1024*1024){alert('File too large. Keep attachments under 3MB.');return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    if(!_fbAvailable)return;
+    // get current item data and add attachment
+    const items=S.futureAgendas[_futAttachDateKey]||{};
+    const fi=items[_futAttachItemId]; if(!fi)return;
+    const attachments=fi.attachments||[];
+    attachments.push({name:f.name,size:f.size,type:f.type,data:ev.target.result,uploadedAt:new Date().toLocaleString()});
+    FUTURE_REF.child(_futAttachDateKey).child(_futAttachItemId).update({attachments});
+  };
+  reader.readAsDataURL(f);
+}
+function downloadFutureAttachment(dateKey, itemId, idx){
+  const fi=(S.futureAgendas[dateKey]||{})[itemId]; if(!fi||!fi.attachments)return;
+  const f=fi.attachments[idx]; if(!f)return;
+  const link=document.createElement('a'); link.href=f.data; link.download=f.name; link.click();
+}
+function removeFutureAttachment(dateKey, itemId, idx){
+  if(!_fbAvailable||!confirm('Remove this attachment?'))return;
+  const fi=(S.futureAgendas[dateKey]||{})[itemId]; if(!fi||!fi.attachments)return;
+  const attachments=fi.attachments.filter((_,i)=>i!==idx);
+  FUTURE_REF.child(dateKey).child(itemId).update({attachments});
 }
 
 // ── Vote actions ──
