@@ -570,8 +570,15 @@ if(_fbAvailable){
     const d=snap.val();if(!d)return;
     // Skip pushes from our own device — we already have the data locally
     if(d.pushedBy&&d.pushedBy.startsWith(_DEVICE_ID)){return;}
+    const prevStatus=S.status;
     applyFirebaseData(d);
-    if(S.currentUser)refreshAll();
+    if(S.currentUser){
+      refreshAll();
+      // If host concluded/adjourned, send all participants to the Now panel
+      if(prevStatus!==S.status&&(S.status==='adjourned'||S.status==='notstarted')){
+        showPanel('nowPanel',document.getElementById('tabNow'));
+      }
+    }
   });
   NOTIF_REF.on('value',snap=>{
     const n=snap.val();if(!n||!S.currentUser)return;
@@ -1251,9 +1258,23 @@ function renderNow(){
           <button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button>
         </div>`:''}</div>
       ${futureAgendaHtml}`
-      :`<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
-        <div style="font-size:13px;color:var(--color-text-secondary)">No future meetings scheduled.</div>
-        ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel(\'calendarPanel\',document.getElementById(\'calendarTab\'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
+      :`<div style="padding:0">
+        ${(()=>{
+          const upcomingAll=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date));
+          if(!upcomingAll.length) return `<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
+            <div style="font-size:13px;color:var(--color-text-secondary)">No meetings scheduled yet.</div>
+            ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel(\'calendarPanel\',document.getElementById(\'calendarTab\'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
+          </div>`;
+          return `<div style="font-size:11px;font-weight:700;color:#2a6e80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px"><i class="ti ti-calendar-event" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Upcoming meetings</div>`+
+          upcomingAll.map((c,i)=>`<div style="background:${i===0?'#d6edf2':'var(--color-background-secondary)'};border:${i===0?'1.5px solid #4E9BAD':'0.5px solid var(--color-border-tertiary)'};border-radius:var(--border-radius-lg);padding:14px 18px;margin-bottom:10px">
+            <div style="font-size:15px;font-weight:700;color:${i===0?'#1e3840':'var(--color-text-primary)'};margin-bottom:4px">${esc(fmtDateShort(c.date))}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:${i===0?'#2a6e80':'var(--color-text-secondary)'}">
+              ${c.start?`<span><i class="ti ti-clock" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${c.start}${c.end?' – '+c.end:''}</span>`:''}
+              ${c.loc?`<span><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${esc(c.loc)}</span>`:''}
+            </div>
+            ${i===0&&isAdmin()?`<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid rgba(78,155,173,.3)"><button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button></div>`:''}
+          </div>`).join('');
+        })()}
       </div>`}
     </div>`;return;
   }
