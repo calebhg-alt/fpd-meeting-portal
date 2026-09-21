@@ -327,7 +327,6 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div class="nav-tab active" id="tabNow" onclick="showPanel('nowPanel',this)"><i class="ti ti-radio"></i> Now</div>
     <div class="nav-tab" onclick="showPanel('rosterPanel',this)"><i class="ti ti-users"></i> Roster</div>
     <div class="nav-tab" onclick="showPanel('agendaPanel',this)"><i class="ti ti-list"></i> Agenda</div>
-    <div class="nav-tab" id="minutesTab" style="display:none" onclick="showPanel('minutesPanel',this)"><i class="ti ti-notes"></i> Minutes</div>
     <div class="nav-tab" id="calendarTab" style="display:none" onclick="showPanel('calendarPanel',this)"><i class="ti ti-calendar"></i> Calendar</div>
     <div class="nav-tab" onclick="showPanel('pastPanel',this)"><i class="ti ti-archive"></i> Past</div>
   </div>
@@ -759,7 +758,6 @@ function enterApp(){
   document.getElementById('userAvBanner').textContent=initials(S.currentUser.name);
   document.getElementById('userAvBanner').className='avatar '+S.currentUser.color;
   const admin=isAdmin();
-  document.getElementById('minutesTab').style.display=admin?'flex':'none';
   document.getElementById('calendarTab').style.display=admin?'flex':'none';
   document.getElementById('adminAddMember').style.display=admin?'block':'none';
   document.getElementById('adminAddAgenda').style.display=admin?'block':'none';
@@ -930,21 +928,20 @@ function buildMinutesText(){
 
 function saveAgendaToArchive(){
   if(!_fbAvailable)return;
-  const text=buildAgendaText();
+  const html=buildAgendaHTML(false);
   const dateLabel=fmtDateShort(S.mtg.date);
   const id='archive_agenda_'+S.mtg.date.replace(/-/g,'');
-  const entry={id,label:'Agenda — '+dateLabel,type:'agenda',date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
-  if(!_fbAvailable)return;
+  const entry={id,label:'Agenda — '+dateLabel,type:'agenda',date:S.mtg.date,savedAt:new Date().toLocaleString(),text:html,isHtml:true};
   ARCHIVE_REF.child(id).set(entry);
   const idx=S.archive.findIndex(a=>a.id===id);
   if(idx>=0)S.archive[idx]=entry;else S.archive.unshift(entry);
 }
 function saveMinutesToArchive(cb){
   if(!_fbAvailable){if(cb)cb();return;}
-  const text=buildMinutesText();
+  const html=buildAgendaHTML(true);
   const dateLabel=fmtDateShort(S.mtg.date);
   const id='archive_minutes_'+S.mtg.date.replace(/-/g,'');
-  const entry={id,label:'Minutes — '+dateLabel,type:'minutes',date:S.mtg.date,savedAt:new Date().toLocaleString(),text};
+  const entry={id,label:'Minutes — '+dateLabel,type:'minutes',date:S.mtg.date,savedAt:new Date().toLocaleString(),text:html,isHtml:true};
   ARCHIVE_REF.child(id).set(entry).then(()=>{
     const idx=S.archive.findIndex(a=>a.id===id);
     if(idx>=0)S.archive[idx]=entry;else S.archive.unshift(entry);
@@ -1653,15 +1650,24 @@ function renderPastMinutes(){
     </div>
     <div class="past-body" id="pb_${a.id}">
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="dlArchive('${a.id}')"><i class="ti ti-download"></i> Download</button>
+        ${a.isHtml
+          ? `<button class="btn btn-sm btn-primary" onclick="openArchive('${a.id}')"><i class="ti ti-external-link"></i> Open / Print</button>`
+          : `<button class="btn btn-sm" onclick="dlArchive('${a.id}')"><i class="ti ti-download"></i> Download</button>`
+        }
         <button class="btn btn-sm btn-danger" onclick="deleteOne('${a.id}')"><i class="ti ti-trash"></i> Delete</button>
       </div>
-      <div class="past-text">${esc(a.text)}</div>
+      ${a.isHtml ? '' : `<div class="past-text">${esc(a.text)}</div>`}
     </div>
   </div>`;}).join('');
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
+function openArchive(id){
+  const a=S.archive.find(x=>x.id===id);if(!a)return;
+  const w=window.open('','_blank');
+  if(!w){alert('Pop-up blocked. Please allow pop-ups for this page.');return;}
+  w.document.write(a.text);w.document.close();
+}
 function deleteOne(id){if(!_fbAvailable||!confirm('Delete?'))return;ARCHIVE_REF.child(id).remove().then(()=>{S.archive=S.archive.filter(a=>a.id!==id);renderPastMinutes();})}
 function clearArchive(){if(!_fbAvailable||!confirm('Clear all past records?'))return;ARCHIVE_REF.remove().then(()=>{S.archive=[];renderPastMinutes();})}
 function uploadMinutes(e){
