@@ -1393,7 +1393,8 @@ function renderNow(){
 // ── Advance to next meeting (without full conclude flow) ──
 function advanceToNextMeeting(){
   if(!isAdmin())return;
-  const next=getNextMeeting();
+  // Use first non-completed calendar entry (includes same-day entries not yet concluded)
+  const next=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   if(!next){alert('No future meetings scheduled. Add dates in the Calendar tab first.');return}
   const prevDate=S.mtg.date;
   const prevLabel=fmtDateShort(prevDate);
