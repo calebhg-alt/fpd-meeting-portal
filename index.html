@@ -742,7 +742,7 @@ function init(){
   seedAgenda('2026-04-22');
   // load Firebase archive only if available
   if(_fbAvailable&&ARCHIVE_REF){
-    ARCHIVE_REF.once('value').then(snap=>{const d=snap.val();if(d)S.archive=Object.values(d);renderPastMinutes();});
+    ARCHIVE_REF.on('value',snap=>{const d=snap.val();S.archive=d?Object.values(d):[];renderPastMinutes();});
   }
   buildLoginDropdown();
   updateBannerText();
@@ -1729,16 +1729,27 @@ function toggleVoteOpen(id){
   }
   pushToFirebase();renderNow();renderAgenda();
 }
-function setMotioner(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.motioner=mid;pushToFirebase();renderNow()}
-function setSeconder(aid,mid){const a=S.agenda.find(x=>x.id===aid);if(!a)return;a.seconder=mid;pushToFirebase();renderNow()}
+function setMotioner(aid,mid){
+  const a=S.agenda.find(x=>x.id===aid);if(!a)return;
+  a.motioner=mid;
+  if(a.motioner&&a.seconder&&a.motionOpen){a.motionOpen=false;addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Motion closed.','decision');}
+  pushToFirebase();renderNow();renderAgenda();
+}
+function setSeconder(aid,mid){
+  const a=S.agenda.find(x=>x.id===aid);if(!a)return;
+  a.seconder=mid;
+  if(a.motioner&&a.seconder&&a.motionOpen){a.motionOpen=false;addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Motion closed.','decision');}
+  pushToFirebase();renderNow();renderAgenda();
+}
 function selfSelectMotion(aid,role){
   const a=S.agenda.find(x=>x.id===aid);if(!a||!S.currentUser)return;
   const mid=S.currentUser.id;
   if(role==='move'){if(a.motioner===mid){a.motioner=''}else if(!a.motioner){a.motioner=mid}else return}
   else{if(!a.motioner||a.motioner===mid)return;if(a.seconder===mid){a.seconder=''}else if(!a.seconder){a.seconder=mid}else return}
-  if(a.motioner&&a.seconder){
-    // Just record mover/seconder — never auto-close here
-    // Auto-close only happens when chair marks item done
+  if(a.motioner&&a.seconder&&a.motionOpen){
+    a.motionOpen=false;
+    addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'. Motion closed.','decision');
+  } else if(a.motioner&&a.seconder){
     addMinute('['+a.title+'] Moved by '+S.members.find(m=>m.id===a.motioner)?.name+' and seconded by '+S.members.find(m=>m.id===a.seconder)?.name+'.','note');
   }
   pushToFirebase();renderNow();renderAgenda();renderMinutes();
@@ -1894,7 +1905,7 @@ function buildAgendaHTML(forMinutes,membersSnap){
 
   // build members rows
   const memberRows=membersToUse.filter(m=>!m.vacant).map(m=>{
-    const present=m.attendance===true||m.attendance==='override'||m.attendance==='present';
+    const present=m.attendance==='app'||m.attendance==='override'||m.attendance===true||m.attendance==='present';
     const absent=!present;
     const pCheck=forMinutes?(present?'✓':''):'☐';
     const aCheck=forMinutes?(absent?'✓':''):'☐';
