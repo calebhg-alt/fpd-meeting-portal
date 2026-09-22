@@ -1833,7 +1833,7 @@ function buildAgendaHTML(forMinutes,membersSnap){
 
   // build members rows
   const memberRows=membersToUse.filter(m=>!m.vacant).map(m=>{
-    const present=m.attendance===true||m.attendance==='override'||m.attendance===\'present\';
+    const present=m.attendance===true||m.attendance==='override'||m.attendance==='present';
     const absent=!present;
     const pCheck=forMinutes?(present?'✓':''):'☐';
     const aCheck=forMinutes?(absent?'✓':''):'☐';
