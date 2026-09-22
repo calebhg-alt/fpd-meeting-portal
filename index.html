@@ -1275,10 +1275,13 @@ function renderNow(){
       const dateKey=c.date.replace(/-/g,'');
       const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
       const isCurrentMtg=c.date===S.mtg.date;
-      // Agenda preview section
+      // Agenda preview section — visible to all members
       const stdItems=['Approval of Agenda','Opening Comments from Co-Chairs','Open Comments from the Public','Approval of Previous Minutes'];
       const agendaPreview=`<div style="border-top:0.5px solid ${isNext?'rgba(78,155,173,.3)':'var(--color-border-tertiary)'};padding:10px 14px;background:${isNext?'rgba(78,155,173,.08)':'var(--color-background-secondary)'};font-size:12px">
-        <div style="font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Agenda items</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+          <div style="font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Agenda items</div>
+          <button class="btn btn-xs" style="font-size:10px;display:inline-flex;align-items:center;gap:3px" onclick="event.stopPropagation();exportPreviewAgenda('${c.id}')"><i class="ti ti-printer" style="font-size:11px"></i> Export / Print</button>
+        </div>
         ${stdItems.map((t,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px;color:var(--color-text-secondary)"><span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+1}.</span>${t}</div>`).join('')}
         ${futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
           <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
@@ -1804,6 +1807,30 @@ function exportAgendaDoc(){openExportWindow(false)}
 function exportMinutesDoc(){openExportWindow(true)}
 function openExportWindow(forMinutes){
   const html=buildAgendaHTML(forMinutes);
+  const w=window.open('','_blank');
+  if(!w){alert('Pop-up blocked. Please allow pop-ups for this page.');return;}
+  w.document.write(html);w.document.close();
+}
+// Export agenda for an upcoming (not-yet-started) meeting using its pre-set items
+function exportPreviewAgenda(calId){
+  const c=S.calendar.find(x=>x.id===calId);
+  if(!c)return;
+  const dateKey=c.date.replace(/-/g,'');
+  const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
+  const stdAgenda=[
+    {title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.'},
+    {title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.'},
+    {title:'Open Comments from the Public',type:'public',desc:'Public comment period.'},
+    {title:'Approval of Previous Minutes',type:'action',desc:'Motion to approve the minutes from the previous meeting.'},
+    ...futItems.map(fi=>({title:fi.title,type:fi.type||'discussion',desc:''}))
+  ];
+  // temporarily swap state for HTML generation
+  const savedAgenda=S.agenda;
+  const savedMtg={...S.mtg};
+  S.agenda=stdAgenda.map((a,i)=>({id:'p'+i,...a,status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]}));
+  S.mtg={...S.mtg,date:c.date,start:c.start||S.mtg.start,end:c.end||S.mtg.end,loc:c.loc||S.mtg.loc};
+  const html=buildAgendaHTML(false);
+  S.agenda=savedAgenda;S.mtg=savedMtg;
   const w=window.open('','_blank');
   if(!w){alert('Pop-up blocked. Please allow pop-ups for this page.');return;}
   w.document.write(html);w.document.close();
