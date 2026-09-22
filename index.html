@@ -573,7 +573,14 @@ function applyFirebaseData(d){
   if(d.status!==undefined)S.status=d.status;
   if(d.broadcastItem!==undefined)S.broadcastItem=d.broadcastItem;
   if(d.mtg)Object.assign(S.mtg,d.mtg);
-  if(d.members)d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm)lm.attendance=dm.attendance});
+  if(d.members){
+    d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm)lm.attendance=dm.attendance;});
+    // Re-assert the logged-in user's presence — Firebase lag on concurrent pushes can reset it to absent
+    if(S.currentUser){
+      const cu=S.members.find(m=>m.id===S.currentUser.id);
+      if(cu){S.currentUser=cu;if(cu.attendance!=='app'&&cu.attendance!=='override')cu.attendance='app';}
+    }
+  }
   if(d.agenda)d.agenda.forEach(da=>{
     const la=S.agenda.find(x=>x.id===da.id);
     if(la){la.status=da.status;la.voteOpen=!!da.voteOpen;la.motionOpen=!!da.motionOpen;
@@ -895,6 +902,26 @@ function concludeMeeting(){
 
     // 6 — build next meeting
     if(next){
+      // 6a — save carry-forward items to FUTURE_REF so all views show them pre-meeting
+      const stdIds=['a01','a02','a03','a04','a05'];
+      const toCarry=S.agenda.filter(a=>
+        !stdIds.includes(a.id)&&
+        a.status!=='complete'&&
+        a.title&&a.title.trim()   // skip empty-title items
+      );
+      if(toCarry.length){
+        const nextDateKey=next.date.replace(/-/g,'');
+        if(!S.futureAgendas[nextDateKey])S.futureAgendas[nextDateKey]={};
+        const existingCount=Object.keys(S.futureAgendas[nextDateKey]).length;
+        const updates={};
+        toCarry.forEach((a,i)=>{
+          const newId='carried_'+uid();
+          const item={id:newId,title:a.title,type:a.type,desc:a.desc||'',order:existingCount+i,carried:true};
+          S.futureAgendas[nextDateKey][newId]=item;
+          updates[newId]=item;
+        });
+        if(_fbAvailable)FUTURE_REF.child(nextDateKey).update(updates);
+      }
       // push next-meeting notification to all devices
       const notif={id:'notif_conclude_'+Date.now(),type:'info',title:'Meeting concluded',sub:'Next meeting: '+fmtDateShort(next.date)+(next.start?' at '+next.start:''),itemTitle:'Meeting concluded',result:'info'};
       S.lastNotifId=notif.id;
@@ -1091,6 +1118,7 @@ function renderCalendar(){
         ${futItems.length?futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px">
           <span style="font-size:11px;font-weight:700;min-width:22px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${TYPE_LABELS[fi.type]||'Discussion'}</span>
+          ${fi.carried?'<span style="font-size:10px;background:#fff3e0;color:#e65100;border:0.5px solid #ffcc02;border-radius:3px;padding:1px 5px;font-weight:600">↩ Carried</span>':''}
           <span style="flex:1">${esc(fi.title)}</span>
           ${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash"></i></button>`:''}
         </div>`).join(''):''}
@@ -1292,6 +1320,7 @@ function renderNow(){
         ${futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
           <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}" style="font-size:9px">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
+          ${fi.carried?'<span style="font-size:9px;background:#fff3e0;color:#e65100;border:0.5px solid #ffcc02;border-radius:3px;padding:1px 4px;font-weight:600">↩ Carried</span>':''}
           <span style="flex:1">${esc(fi.title)}</span>
           ${admin?`<button class="btn btn-xs" style="color:var(--color-text-danger);padding:1px 5px" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash" style="font-size:10px"></i></button>`:''}
         </div>`).join('')}
@@ -1352,6 +1381,7 @@ function renderNow(){
         ${futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
           <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}" style="font-size:9px">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
+          ${fi.carried?'<span style="font-size:9px;background:#fff3e0;color:#e65100;border:0.5px solid #ffcc02;border-radius:3px;padding:1px 4px;font-weight:600">↩ Carried</span>':''}
           <span style="flex:1">${esc(fi.title)}</span>
           ${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger);padding:1px 5px" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash" style="font-size:10px"></i></button>`:''}
         </div>`).join('')}
@@ -1503,21 +1533,18 @@ function advanceToNextMeeting(){
   if(!next){alert('No future meetings scheduled. Add dates in the Calendar tab first.');return}
   const prevDate=S.mtg.date;
   const prevLabel=fmtDateShort(prevDate);
-  const standardIds=['a01','a02','a03','a04','a05'];
-  // carry forward any incomplete non-standard items
-  const carryItems=S.agenda
-    .filter(a=>!standardIds.includes(a.id)&&a.status!=='complete')
-    .map(a=>({...a,id:'co_'+uid(),status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[],attachments:[],carried:true}));
-  // grab any pre-set future agenda items for this next meeting date
+  // grab pre-set future agenda items (includes carry-forward items saved by concludeMeeting)
+  // filter out any with empty titles
   const futureItems=(S.futureAgendas[next.date]?Object.values(S.futureAgendas[next.date]):[])
+    .filter(a=>a.title&&a.title.trim())
     .sort((a,b)=>(a.order||0)-(b.order||0))
-    .map(a=>({...a,status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[]}));
+    .map(a=>({...a,status:'pending',votes:{},voteOpen:false,motionOpen:false,motioner:'',seconder:'',notes:[],attachments:[]}));
   const newAgenda=[
     {id:'a01',title:'Approval of Agenda',type:'action',desc:'Motion to approve the agenda for this meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
     {id:'a02',title:'Opening Comments from Co-Chairs',type:'info',desc:'Opening remarks from Faculty Co-Chair and Administrative Co-Chair.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
     {id:'a03',title:'Open Comments from the Public',type:'public',desc:'Public comment period.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
     {id:'a04',title:'Approval of Previous Minutes — '+prevLabel,type:'action',desc:'Motion to approve the minutes from the '+prevLabel+' meeting.',status:'pending',votes:{},notes:[],voteOpen:false,motionOpen:false,motioner:'',seconder:'',attachments:[]},
-    ...carryItems,...futureItems
+    ...futureItems
   ];
   S.mtg={name:S.mtg.name,date:next.date,start:next.start||S.mtg.start,end:next.end||S.mtg.end,loc:next.loc||S.mtg.loc};
   S.agenda=newAgenda;S.minutes=[];S.status='notstarted';S.broadcastItem=null;
