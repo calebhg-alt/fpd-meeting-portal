@@ -1080,32 +1080,38 @@ function renderCalendar(){
     // future agenda items for this date
     const dateKey=c.date.replace(/-/g,'');
     const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
-    const futHtml=isUpcoming&&isAdmin()?`
+    const stdItems=['Approval of Agenda','Opening Comments from Co-Chairs','Open Comments from the Public','Approval of Previous Minutes'];
+    const futHtml=isUpcoming?`
       <div style="border-top:0.5px solid var(--color-border-tertiary);padding:10px 14px;background:var(--color-background-secondary)">
-        <div class="sec-hd" style="margin-bottom:8px">Pre-set agenda items <span style="font-weight:400;text-transform:none;font-size:10px;letter-spacing:0">(added to meeting when it loads)</span></div>
-        ${futItems.length?futItems.map(fi=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:13px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+          <div class="sec-hd" style="margin-bottom:0">Agenda</div>
+          <button class="btn btn-xs" style="font-size:11px;display:inline-flex;align-items:center;gap:3px" onclick="event.stopPropagation();exportPreviewAgenda('${c.id}')"><i class="ti ti-printer" style="font-size:11px"></i> Export / Print</button>
+        </div>
+        ${stdItems.map((t,si)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px;color:var(--color-text-secondary)"><span style="font-size:11px;font-weight:700;min-width:22px">${si+1}.</span>${t}</div>`).join('')}
+        ${futItems.length?futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px">
+          <span style="font-size:11px;font-weight:700;min-width:22px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${TYPE_LABELS[fi.type]||'Discussion'}</span>
           <span style="flex:1">${esc(fi.title)}</span>
-          <button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash"></i></button>
-        </div>`).join(''):'<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">No pre-set items yet.</div>'}
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-          <input type="text" id="fi_title_${dateKey}" placeholder="Item title" style="flex:2;min-width:0;font-size:12px" onkeydown="if(event.key==='Enter')addFutureItem('${dateKey}')">
+          ${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger)" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash"></i></button>`:''}
+        </div>`).join(''):''}
+        ${isAdmin()?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <input type="text" id="fi_title_${dateKey}" placeholder="Add agenda item…" style="flex:2;min-width:0;font-size:12px" onkeydown="if(event.key==='Enter')addFutureItem('${dateKey}')">
           <select id="fi_type_${dateKey}" style="min-width:110px;font-size:12px">
             <option value="discussion">Discussion</option><option value="action">Action item</option>
             <option value="consent">Consent</option><option value="info">Informational</option>
           </select>
-          <button class="btn btn-xs btn-primary" onclick="addFutureItem('${dateKey}')"><i class="ti ti-plus"></i> Add</button>
-        </div>
+          <button class="btn btn-xs btn-primary" onclick="event.stopPropagation();addFutureItem('${dateKey}')"><i class="ti ti-plus"></i> Add</button>
+        </div>`:''}
       </div>`:'';
     return`<div class="agenda-card ${isActive?'is-live':''}">
-      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;" ${isUpcoming&&isAdmin()?`onclick="toggleAg('cal_body_${dateKey}',this)"  style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 14px;"`:''}>
+      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;${isUpcoming?'cursor:pointer':''}" ${isUpcoming?`onclick="toggleAg('cal_body_${dateKey}',this)"`:''}>
         <div class="cal-date-badge ${isPast?'badge-past':isActive?'badge-active':''}" style="font-size:11px;padding:4px 10px;min-width:80px;text-align:center">${esc(fmtDateShort(c.date))}</div>
         <div class="cal-info" style="flex:1">
           <div class="cal-info-title">${esc(c.start||'')}${c.end?' – '+esc(c.end):''}</div>
-          <div class="cal-info-sub">${esc(c.loc||'Location TBD')}${futItems.length?' · '+futItems.length+' pre-set item'+(futItems.length>1?'s':''):''}</div>
+          <div class="cal-info-sub">${esc(c.loc||'Location TBD')}${futItems.length?' · '+futItems.length+' additional item'+(futItems.length>1?'s':''):''}</div>
         </div>
         <span class="cal-status-chip ${isPast?'cs-past':isActive?'cs-active':'cs-upcoming'}">${isPast?'Past':isActive?'Active':'Upcoming'}</span>
-        ${isUpcoming&&isAdmin()?`<i class="ti ti-chevron-down chevron" style="font-size:14px;color:var(--color-text-secondary)"></i>`:''}
+        ${isUpcoming?`<i class="ti ti-chevron-down chevron" style="font-size:14px;color:var(--color-text-secondary)"></i>`:''}
         ${isAdmin()&&!isActive?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:4px" onclick="event.stopPropagation();deleteCalEntry('${c.id}')"><i class="ti ti-trash"></i></button>`:''}
       </div>
       <div id="cal_body_${dateKey}" style="display:none">${futHtml}</div>
@@ -1319,62 +1325,63 @@ function renderNow(){
   }
 
   if(S.status==='adjourned'){
-    const next=getNextMeeting();
-    // build future agenda preview for admin
-    let futureAgendaHtml='';
-    if(isAdmin()&&next){
-      const dateKey=next.date.replace(/-/g,'');
-      const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
-      futureAgendaHtml=`<div style="margin-top:20px;text-align:left;max-width:460px;margin-left:auto;margin-right:auto">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div class="sec-hd" style="margin-bottom:0">Pre-set agenda for ${esc(fmtDateShort(next.date))}</div>
-          <button class="btn btn-xs btn-primary" onclick="openFutureAgendaModal('${dateKey}')"><i class="ti ti-edit"></i> Edit</button>
-        </div>
-        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Standard items (I–V) auto-populate. Items below are added after:</div>
-        ${futItems.length?futItems.map((fi,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:5px;font-size:13px">
-          <span style="font-size:11px;font-weight:600;color:var(--color-text-secondary);min-width:20px">${i+6}.</span>
-          <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
-          <span style="flex:1">${esc(fi.title)}</span>
-        </div>`).join(''):`<div style="font-size:12px;color:var(--color-text-secondary);padding:8px 0;font-style:italic">No additional items yet. Click Edit to add.</div>`}
-      </div>`;
+    const allMtgs=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date));
+    const adjHdr=`<div style="text-align:center;padding:1.5rem 0 1rem">
+      <i class="ti ti-door-exit" style="font-size:28px;color:var(--color-text-secondary);display:block;margin-bottom:6px"></i>
+      <div style="font-size:14px;font-weight:500;color:var(--color-text-primary)">Meeting adjourned</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(fmtDateShort(S.mtg.date))}</div>
+    </div>`;
+    if(!allMtgs.length){
+      el.innerHTML=adjHdr+`<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
+        <div style="font-size:13px;color:var(--color-text-secondary)">No upcoming meetings scheduled.</div>
+        ${isAdmin()?`<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel('calendarPanel',document.getElementById('calendarTab'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>`:''}
+      </div>`;return;
     }
-    el.innerHTML=`<div style="padding:2rem 0.5rem">
-      <div style="text-align:center;margin-bottom:20px">
-        <i class="ti ti-door-exit" style="font-size:32px;color:var(--color-text-secondary);display:block;margin-bottom:8px"></i>
-        <div style="font-size:14px;font-weight:500;color:var(--color-text-primary)">Meeting adjourned</div>
-        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(fmtDateShort(S.mtg.date))}</div>
-      </div>
-      ${next?`
-      <div style="background:#d6edf2;border:1.5px solid #4E9BAD;border-radius:var(--border-radius-lg);padding:16px 20px;margin-bottom:16px">
-        <div style="font-size:11px;font-weight:700;color:#2a6e80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px"><i class="ti ti-calendar-event" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Next meeting</div>
-        <div style="font-size:17px;font-weight:700;color:#1e3840;margin-bottom:4px">${esc(fmtDateShort(next.date))}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#2a6e80">
-          ${next.start?`<span><i class="ti ti-clock" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${next.start}${next.end?' – '+next.end:''}</span>`:''}
-          ${next.loc?`<span><i class="ti ti-map-pin" style="font-size:13px;vertical-align:-1px;margin-right:3px"></i>${esc(next.loc)}</span>`:''}
+    const listHdr=`<div style="font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px"><i class="ti ti-calendar" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Upcoming meetings</div>`;
+    const stdItems=['Approval of Agenda','Opening Comments from Co-Chairs','Open Comments from the Public','Approval of Previous Minutes'];
+    const cards=allMtgs.map((c,i)=>{
+      const isNext=i===0;
+      const dateKey=c.date.replace(/-/g,'');
+      const futItems=S.futureAgendas[dateKey]?Object.values(S.futureAgendas[dateKey]).sort((a,b)=>(a.order||0)-(b.order||0)):[];
+      const agendaSection=`<div style="border-top:0.5px solid ${isNext?'rgba(78,155,173,.3)':'var(--color-border-tertiary)'};padding:10px 14px;background:${isNext?'rgba(78,155,173,.08)':'var(--color-background-secondary)'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+          <div style="font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Agenda</div>
+          <button class="btn btn-xs" style="font-size:10px;display:inline-flex;align-items:center;gap:3px" onclick="event.stopPropagation();exportPreviewAgenda('${c.id}')"><i class="ti ti-printer" style="font-size:11px"></i> Export / Print</button>
         </div>
-        ${isAdmin()?`<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(78,155,173,.3);display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button>
-        </div>`:''}</div>
-      ${futureAgendaHtml}`
-      :`<div style="padding:0">
-        ${(()=>{
-          const upcomingAll=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date));
-          if(!upcomingAll.length) return `<div style="text-align:center;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-lg)">
-            <div style="font-size:13px;color:var(--color-text-secondary)">No meetings scheduled yet.</div>
-            ${isAdmin()?'<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="showPanel(\'calendarPanel\',document.getElementById(\'calendarTab\'))"><i class="ti ti-calendar-plus"></i> Schedule meetings</button></div>':''}
-          </div>`;
-          return `<div style="font-size:11px;font-weight:700;color:#2a6e80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px"><i class="ti ti-calendar-event" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Upcoming meetings</div>`+
-          upcomingAll.map((c,i)=>`<div style="background:${i===0?'#d6edf2':'var(--color-background-secondary)'};border:${i===0?'1.5px solid #4E9BAD':'0.5px solid var(--color-border-tertiary)'};border-radius:var(--border-radius-lg);padding:14px 18px;margin-bottom:10px">
-            <div style="font-size:15px;font-weight:700;color:${i===0?'#1e3840':'var(--color-text-primary)'};margin-bottom:4px">${esc(fmtDateShort(c.date))}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:${i===0?'#2a6e80':'var(--color-text-secondary)'}">
-              ${c.start?`<span><i class="ti ti-clock" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${c.start}${c.end?' – '+c.end:''}</span>`:''}
-              ${c.loc?`<span><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:2px"></i>${esc(c.loc)}</span>`:''}
-            </div>
-            ${i===0&&isAdmin()?`<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid rgba(78,155,173,.3)"><button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button></div>`:''}
-          </div>`).join('');
-        })()}
-      </div>`}
-    </div>`;return;
+        ${stdItems.map((t,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px;color:var(--color-text-secondary)"><span style="font-size:10px;font-weight:700;min-width:18px">${si+1}.</span>${t}</div>`).join('')}
+        ${futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
+          <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
+          <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}" style="font-size:9px">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
+          <span style="flex:1">${esc(fi.title)}</span>
+          ${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger);padding:1px 5px" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash" style="font-size:10px"></i></button>`:''}
+        </div>`).join('')}
+        ${isAdmin()?`<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
+          <input type="text" id="ahfi_title_${dateKey}" placeholder="Add agenda item…" style="flex:2;min-width:0;font-size:11px;padding:5px 8px" onkeydown="if(event.key==='Enter'){const s=document.getElementById('ahfi_type_${dateKey}');addFutureItem('${dateKey}',this,s);}">
+          <select id="ahfi_type_${dateKey}" style="min-width:100px;font-size:11px;padding:5px 6px">
+            <option value="discussion">Discussion</option><option value="action">Action item</option>
+            <option value="consent">Consent</option><option value="info">Informational</option>
+          </select>
+          <button class="btn btn-xs btn-primary" onclick="event.stopPropagation();addFutureItem('${dateKey}',document.getElementById('ahfi_title_${dateKey}'),document.getElementById('ahfi_type_${dateKey}'))"><i class="ti ti-plus"></i></button>
+        </div>`:''}
+        ${isNext&&isAdmin()?`<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid rgba(78,155,173,.3)"><button class="btn btn-primary btn-sm" onclick="advanceToNextMeeting()"><i class="ti ti-arrow-right"></i> Load next meeting</button></div>`:''}
+      </div>`;
+      return `<div class="agenda-card ${isNext?'is-live':''}" style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer" onclick="toggleAg('adjbody_${dateKey}',this)">
+          <div style="font-size:12px;font-weight:700;padding:5px 10px;border-radius:var(--border-radius-md);background:${isNext?'#4E9BAD':'var(--color-background-secondary)'};color:${isNext?'#fff':'var(--color-text-secondary)'};flex-shrink:0;min-width:90px;text-align:center">${esc(fmtDateShort(c.date))}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:${isNext?600:500};color:var(--color-text-primary)">${c.start||''} ${c.end?' – '+c.end:''}${futItems.length?' · <span style="color:#4E9BAD;font-size:11px">'+futItems.length+' item'+(futItems.length>1?'s':'')+'</span>':''}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:1px">${esc(c.loc||'Location TBD')}${isNext?' · <span style="color:#1e5e6e;font-weight:600">Next up</span>':''}</div>
+          </div>
+          ${isAdmin()?`<div style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
+            <button class="btn btn-xs" title="Edit" onclick="openEditCal('${c.id}')"><i class="ti ti-edit" style="font-size:11px"></i></button>
+            <button class="btn btn-xs" style="color:var(--color-text-danger)" title="Delete" onclick="deleteCalEntry('${c.id}')"><i class="ti ti-trash" style="font-size:11px"></i></button>
+          </div>`:''}
+          <i class="ti ti-chevron-${isNext?'up':'down'} chevron ${isNext?'open':''}" style="font-size:13px;color:var(--color-text-secondary)"></i>
+        </div>
+        <div id="adjbody_${dateKey}" style="display:${isNext?'block':'none'}">${agendaSection}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML=adjHdr+`<div style="padding:0 0 0.5rem">${listHdr}${cards}</div>`;return;
   }
 
   const a=S.agenda.find(x=>x.id===S.broadcastItem);
