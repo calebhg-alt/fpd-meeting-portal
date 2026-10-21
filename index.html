@@ -1381,7 +1381,7 @@ function renderNow(){
             <button class="btn btn-xs" title="Edit" onclick="openEditCal('${c.id}')"><i class="ti ti-edit" style="font-size:11px"></i></button>
             <button class="btn btn-xs" style="color:var(--color-text-danger)" title="Delete" onclick="deleteCalEntry('${c.id}')"><i class="ti ti-trash" style="font-size:11px"></i></button>
           </div>`:''}
-          ${isNext&&isCurrentMtg&&admin?`<button class="btn btn-success btn-sm" onclick="event.stopPropagation();callToOrder()"><i class="ti ti-gavel"></i> Call to order</button>`:''}
+          ${isNext&&admin?`<button class="btn btn-success btn-sm" style="font-weight:600" onclick="event.stopPropagation();callOrderViaSync('${c.id}')"><i class="ti ti-gavel"></i> Call to order</button>`:''}
           <i class="ti ti-chevron-${isNext?'up':'down'} chevron ${isNext?'open':''}" style="font-size:13px;color:var(--color-text-secondary)"></i>
         </div>
         <div id="hbody_${dateKey}" style="display:${isNext?'block':'none'}">${agendaPreview}</div>
@@ -1572,10 +1572,12 @@ function renderNow(){
 
 
 // ── Advance to next meeting (without full conclude flow) ──
-function advanceToNextMeeting(){
+function advanceToNextMeeting(afterFn){
   if(!isAdmin())return;
-  // Use first non-completed calendar entry (includes same-day entries not yet concluded)
-  const next=S.calendar.filter(c=>c.status!=='completed'&&c.date>S.mtg.date).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
+  // Use first non-completed calendar entry sorted by date.
+  // concludeMeeting sets curCal.status='completed' in memory before calling this,
+  // so the just-concluded meeting is already excluded.
+  const next=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   if(!next){alert('No future meetings scheduled. Add dates in the Calendar tab first.');return}
   const prevDate=S.mtg.date;
   const prevLabel=fmtDateShort(prevDate);
@@ -1600,8 +1602,23 @@ function advanceToNextMeeting(){
   pushToFirebase();
   updateBannerText();updateBanner();renderRoster();renderAgenda();renderMinutes();renderNow();
   showPanel('nowPanel',document.getElementById('tabNow'));
+  if(afterFn)afterFn();
 }
 
+
+// ── Sync & call to order (handles corrupted/stale S.mtg.date) ──
+function callOrderViaSync(calId){
+  if(!isAdmin())return;
+  const cal=S.calendar.find(c=>c.id===calId);
+  if(!cal)return;
+  if(S.mtg.date===cal.date){
+    callToOrder();
+  } else {
+    // S.mtg is out of sync — advance to the first non-completed meeting
+    // (which is this calendar entry) then call to order
+    advanceToNextMeeting(callToOrder);
+  }
+}
 
 // ── Future Agenda Modal ──
 let _futModalDateKey='';
