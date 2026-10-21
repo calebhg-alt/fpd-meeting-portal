@@ -898,7 +898,7 @@ function concludeMeeting(){
   saveMinutesToArchive(()=>{
     // 5 — mark current calendar entry as completed
     const curCal=S.calendar.find(c=>c.date===S.mtg.date);
-    if(curCal&&_fbAvailable)CALENDAR_REF.child(curCal.id).update({status:'completed'});
+    if(curCal){curCal.status='completed';if(_fbAvailable)CALENDAR_REF.child(curCal.id).update({status:'completed'});}
 
     // 6 — build next meeting
     if(next){
@@ -1512,9 +1512,19 @@ function renderNow(){
     chairPanel=`<div class="chair-ctrl">
       <div class="chair-ctrl-title"><i class="ti ti-gavel" style="font-size:13px"></i> Chair controls — private</div>
       <div class="sec-hd">Agenda navigation</div>${buildAgendaNav(a.id)}
-      <div style="margin-bottom:12px">
-        <button class="btn btn-xs ${a.status==='complete'?'btn-success':''}" onclick="markItemDone('${a.id}')">${a.status==='complete'?'✓ Item complete':'Mark item complete'}</button>
-      </div>
+      ${a.status==='complete'
+        ?`<div style="margin-bottom:14px;background:rgba(78,155,173,0.08);border:1px solid rgba(78,155,173,0.4);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-size:13px;font-weight:600;color:#1e5e6e"><i class="ti ti-circle-check"></i> Item concluded</span>
+            <button class="btn btn-xs" onclick="markItemDone('${a.id}')">Reopen</button>
+          </div>`
+        :`<div style="margin-bottom:14px;background:rgba(232,116,26,0.07);border:1.5px solid rgba(232,116,26,0.4);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#944d0e;margin-bottom:2px">Conclude this item</div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">Press when discussion is complete to log &amp; advance.</div>
+            </div>
+            <button class="btn btn-warn" style="white-space:nowrap;font-weight:600" onclick="markItemDone('${a.id}')"><i class="ti ti-circle-check"></i> Mark complete</button>
+          </div>`
+      }
       <div class="sec-hd">Minutes</div>
       <div style="margin-bottom:8px">${notesHtml}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
@@ -1565,7 +1575,7 @@ function renderNow(){
 function advanceToNextMeeting(){
   if(!isAdmin())return;
   // Use first non-completed calendar entry (includes same-day entries not yet concluded)
-  const next=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
+  const next=S.calendar.filter(c=>c.status!=='completed'&&c.date>S.mtg.date).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   if(!next){alert('No future meetings scheduled. Add dates in the Calendar tab first.');return}
   const prevDate=S.mtg.date;
   const prevLabel=fmtDateShort(prevDate);
