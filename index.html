@@ -454,6 +454,23 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 </div>
 
 
+<!-- EDIT MINUTES MODAL -->
+<div class="modal-overlay" id="editMinutesModal" style="z-index:1100">
+  <div class="modal" style="width:780px;max-width:97vw;height:88vh;display:flex;flex-direction:column;padding:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--color-text-primary)"><i class="ti ti-edit" style="font-size:14px;vertical-align:-2px;margin-right:5px"></i>Edit minutes</div>
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Click any text to edit it directly. Votes, notes, and attendance can all be changed.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-success btn-sm" onclick="saveMinutesEdit()"><i class="ti ti-device-floppy"></i> Save changes</button>
+        <button class="btn btn-sm" onclick="closeMinutesEdit()">Cancel</button>
+      </div>
+    </div>
+    <iframe id="minutesEditFrame" style="flex:1;border:none;background:#fff;border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg)"></iframe>
+  </div>
+</div>
+
 <!-- FUTURE AGENDA MODAL -->
 <div class="modal-overlay" id="futureAgendaModal">
   <div class="modal" style="width:500px;max-width:96%">
@@ -1114,6 +1131,43 @@ function addCurrentMtgItemHome(dateKey){
   inp.value='';
   pushToFirebase();renderNow();renderAgenda();
 }
+// Inline editing of agenda items on the Now tab home screen
+function editHomeItem(dateKey,isCurrentMtg,itemId,num){
+  const el=document.getElementById('hitem_'+dateKey+'_'+itemId);
+  if(!el)return;
+  const item=isCurrentMtg
+    ? S.agenda.find(x=>x.id===itemId)
+    : (S.futureAgendas[dateKey]&&S.futureAgendas[dateKey][itemId]);
+  if(!item)return;
+  const typeOpts=['discussion','action','consent','info','public'].map(v=>`<option value="${v}"${item.type===v?' selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
+  el.innerHTML=`
+    <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${num}.</span>
+    <select id="hedit_type_${itemId}" style="font-size:10px;padding:2px 4px;border:1px solid var(--color-border-primary);border-radius:4px;min-width:82px">${typeOpts}</select>
+    <input id="hedit_title_${itemId}" type="text" value="${esc(item.title)}" style="flex:1;font-size:11px;padding:3px 6px;min-width:0;border:1px solid #4E9BAD;border-radius:4px;outline:none"
+      onkeydown="if(event.key==='Enter'){event.stopPropagation();saveHomeItem('${dateKey}',${isCurrentMtg?'true':'false'},'${itemId}',${num});}if(event.key==='Escape'){event.stopPropagation();renderNow();}">
+    <button class="btn btn-xs btn-success" style="padding:2px 7px;font-size:11px" onclick="event.stopPropagation();saveHomeItem('${dateKey}',${isCurrentMtg?'true':'false'},'${itemId}',${num})"><i class="ti ti-check"></i></button>
+    <button class="btn btn-xs" style="padding:2px 7px;font-size:11px" onclick="event.stopPropagation();renderNow()">✕</button>`;
+  const inp=el.querySelector('input');if(inp){inp.focus();inp.select();}
+}
+function saveHomeItem(dateKey,isCurrentMtg,itemId,num){
+  const inp=document.getElementById('hedit_title_'+itemId);
+  const sel=document.getElementById('hedit_type_'+itemId);
+  if(!inp)return;
+  const newTitle=inp.value.trim();if(!newTitle)return;
+  const newType=sel?sel.value:'discussion';
+  if(isCurrentMtg){
+    const item=S.agenda.find(x=>x.id===itemId);
+    if(item){item.title=newTitle;item.type=newType;}
+  } else {
+    if(S.futureAgendas[dateKey]&&S.futureAgendas[dateKey][itemId]){
+      S.futureAgendas[dateKey][itemId].title=newTitle;
+      S.futureAgendas[dateKey][itemId].type=newType;
+      if(_fbAvailable)FUTURE_REF.child(dateKey).child(itemId).update({title:newTitle,type:newType});
+    }
+  }
+  pushToFirebase();
+  renderNow();renderAgenda();
+}
 function clearCalendar(){
   if(!_fbAvailable||!confirm('Remove all scheduled meetings?'))return;
   CALENDAR_REF.remove();
@@ -1248,6 +1302,17 @@ function chairToggleAttendance(id){
   else{m.attendance='override';}
   pushToFirebase();renderRoster();renderNow();
 }
+function fmtMemberName(name){
+  if(!name||name==='VACANT')return name;
+  if(_rosterSortMode==='last'){
+    // "First Middle Last" → "Last, First Middle"
+    const parts=name.trim().split(/\s+/);
+    if(parts.length<2)return name;
+    const last=parts.pop();
+    return last+', '+parts.join(' ');
+  }
+  return name; // first-name or manual: show as-is
+}
 function renderRoster(){
   const el=document.getElementById('memberList');
   const p=presentCount(),t=eligibleCount(),need=quorumNeeded(),met=p>=need&&t>0;
@@ -1273,7 +1338,7 @@ function renderRoster(){
     const adminDrag=isAdmin()&&!m.vacant?`draggable="true" ondragstart="rosterDragStart(event,'${m.id}')" ondragover="rosterDragOver(event)" ondrop="rosterDrop(event,'${m.id}')" ondragleave="rosterDragLeave(event)"`:'';
     return`<div class="member-card ${m.vacant?'vacant-card':''}" ${adminDrag}>
       <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
-      <div class="member-info"><div class="member-name">${esc(m.name)}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
+      <div class="member-info"><div class="member-name">${esc(m.vacant?m.name:fmtMemberName(m.name))}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
       <div style="display:flex;align-items:center">${attBadge}${attBtn}</div>
       ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
     </div>`;
@@ -1282,6 +1347,7 @@ function renderRoster(){
 
 // ── Roster sort & drag ──
 function sortRosterBy(by){
+  _rosterSortMode=by;
   if(!isAdmin())return;
   const sorted=[...S.members].sort((a,b)=>{
     if(a.vacant&&!b.vacant)return 1;if(!a.vacant&&b.vacant)return -1;
@@ -1296,6 +1362,7 @@ function sortRosterBy(by){
   pushToFirebase();renderRoster();
 }
 let _dragSrcId=null;
+let _rosterSortMode=''; // 'first', 'last', or '' (manual)
 function rosterDragStart(e,id){
   _dragSrcId=id;
   e.dataTransfer.effectAllowed='move';
@@ -1442,11 +1509,11 @@ function renderNow(){
           <button class="btn btn-xs" style="font-size:10px;display:inline-flex;align-items:center;gap:3px" onclick="event.stopPropagation();exportPreviewAgenda('${c.id}')"><i class="ti ti-printer" style="font-size:11px"></i> Export / Print</button>
         </div>
         ${stdItems.map((t,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px;color:var(--color-text-secondary)"><span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+1}.</span>${t}</div>`).join('')}
-        ${displayItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
+        ${displayItems.map((fi,si)=>`<div id="hitem_${dateKey}_${fi.id}" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
           <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}" style="font-size:9px">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
           ${fi.carried?'<span style="font-size:9px;background:#fff3e0;color:#e65100;border:0.5px solid #ffcc02;border-radius:3px;padding:1px 4px;font-weight:600">↩ Carried</span>':''}
-          <span style="flex:1">${esc(fi.title)}</span>
+          <span style="flex:1;${admin?'cursor:pointer':''}" ${admin?`onclick="event.stopPropagation();editHomeItem('${dateKey}',${isCurrentMtg},'${fi.id}',${si+5})" title="Click to edit"`:''}>${esc(fi.title)}${admin?'<i class="ti ti-pencil" style="font-size:9px;color:var(--color-text-secondary);margin-left:3px;opacity:0.45"></i>':''}</span>
           ${admin?`<button class="btn btn-xs" style="color:var(--color-text-danger);padding:1px 5px" onclick="event.stopPropagation();${_delItemJs(fi.id)}"><i class="ti ti-trash" style="font-size:10px"></i></button>`:''}
         </div>`).join('')}
         ${admin?`<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
@@ -1503,11 +1570,11 @@ function renderNow(){
           <button class="btn btn-xs" style="font-size:10px;display:inline-flex;align-items:center;gap:3px" onclick="event.stopPropagation();exportPreviewAgenda('${c.id}')"><i class="ti ti-printer" style="font-size:11px"></i> Export / Print</button>
         </div>
         ${stdItems.map((t,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px;color:var(--color-text-secondary)"><span style="font-size:10px;font-weight:700;min-width:18px">${si+1}.</span>${t}</div>`).join('')}
-        ${futItems.map((fi,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
+        ${futItems.map((fi,si)=>`<div id="hitem_${dateKey}_${fi.id}" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid rgba(0,0,0,.05);font-size:12px">
           <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--color-text-secondary)">${si+5}.</span>
           <span class="type-badge ${TYPE_BADGE[fi.type]||'tb-discussion'}" style="font-size:9px">${(TYPE_LABELS[fi.type]||'Discussion').split(' ')[0]}</span>
           ${fi.carried?'<span style="font-size:9px;background:#fff3e0;color:#e65100;border:0.5px solid #ffcc02;border-radius:3px;padding:1px 4px;font-weight:600">↩ Carried</span>':''}
-          <span style="flex:1">${esc(fi.title)}</span>
+          <span style="flex:1;${isAdmin()?'cursor:pointer':''}" ${isAdmin()?`onclick="event.stopPropagation();editHomeItem('${dateKey}',false,'${fi.id}',${si+5})" title="Click to edit"`:''}>${esc(fi.title)}${isAdmin()?'<i class="ti ti-pencil" style="font-size:9px;color:var(--color-text-secondary);margin-left:3px;opacity:0.45"></i>':''}</span>
           ${isAdmin()?`<button class="btn btn-xs" style="color:var(--color-text-danger);padding:1px 5px" onclick="event.stopPropagation();removeFutureItem('${dateKey}','${fi.id}')"><i class="ti ti-trash" style="font-size:10px"></i></button>`:''}
         </div>`).join('')}
         ${isAdmin()?`<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
@@ -1975,44 +2042,75 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
+let _editArchiveId=null;
 function editArchiveEntry(id){
   if(!isAdmin())return;
-  const code=prompt('Enter access code to edit minutes:');
+  const code=prompt('Enter access code to edit:');
   if(!code)return;
   if(code.trim()!==PASSWORD){alert('Incorrect access code.');return;}
   const a=S.archive.find(x=>x.id===id);if(!a)return;
-  const body=document.getElementById('pb_'+id);if(!body)return;
-  // Show inline editor
-  const existing=document.getElementById('archedit_'+id);
-  if(existing){existing.remove();return;}
-  const editor=document.createElement('div');
-  editor.id='archedit_'+id;
-  editor.style.cssText='margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px';
-  editor.innerHTML=`
-    <div style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin-bottom:6px"><i class="ti ti-edit" style="font-size:12px"></i> Edit minutes</div>
-    <textarea id="archedit_ta_${id}" style="width:100%;min-height:200px;font-family:var(--font-sans);font-size:12px;line-height:1.6;resize:vertical;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px">${(a.text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
-    <div style="display:flex;gap:6px;margin-top:8px">
-      <button class="btn btn-sm btn-success" onclick="saveArchiveEdit('${id}')"><i class="ti ti-device-floppy"></i> Save changes</button>
-      <button class="btn btn-sm" onclick="document.getElementById('archedit_${id}').remove()">Cancel</button>
-    </div>`;
-  body.appendChild(editor);
-  document.getElementById('archedit_ta_'+id).focus();
-}
-function saveArchiveEdit(id){
-  const ta=document.getElementById('archedit_ta_'+id);if(!ta)return;
-  const newText=ta.value;
-  const a=S.archive.find(x=>x.id===id);if(!a)return;
-  a.text=newText;
-  if(_fbAvailable&&ARCHIVE_REF){
-    ARCHIVE_REF.child(id).update({text:newText,lastEdited:new Date().toLocaleString()})
-      .then(()=>{
-        document.getElementById('archedit_'+id).remove();
-        renderPastMinutes();
-      });
+  _editArchiveId=id;
+  const frame=document.getElementById('minutesEditFrame');
+  // Write the stored HTML into the iframe so all styles render correctly
+  frame.onload=()=>{
+    try{
+      const doc=frame.contentDocument||frame.contentWindow.document;
+      // Make text nodes editable
+      doc.body.contentEditable='true';
+      doc.body.style.outline='none';
+      // Hide print/action buttons inside the document
+      doc.querySelectorAll('button,.no-print').forEach(el=>{el.style.display='none';});
+    }catch(e){console.warn('frame edit setup:',e);}
+  };
+  if(a.isHtml&&a.text){
+    // Write HTML directly into the iframe
+    const doc=frame.contentDocument||frame.contentWindow.document;
+    doc.open();doc.write(a.text);doc.close();
+    // Trigger onload manually since write() doesn't always fire it
+    setTimeout(()=>{
+      try{
+        const d=frame.contentDocument||frame.contentWindow.document;
+        d.body.contentEditable='true';
+        d.body.style.outline='none';
+        d.querySelectorAll('button,.no-print').forEach(el=>{el.style.display='none';});
+      }catch(e){}
+    },100);
   } else {
-    document.getElementById('archedit_'+id).remove();
-    renderPastMinutes();
+    // Plain text fallback — build a simple formatted page
+    const doc=frame.contentDocument||frame.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.7;padding:1.5rem 2rem;color:#1e2a2d;outline:none}</style>
+      </head><body contenteditable="true">${esc(a.text||'').replace(/\n/g,'<br>')}</body></html>`);
+    doc.close();
   }
+  document.getElementById('editMinutesModal').classList.add('open');
+}
+function closeMinutesEdit(){
+  document.getElementById('editMinutesModal').classList.remove('open');
+  _editArchiveId=null;
+  // Clear the iframe
+  const frame=document.getElementById('minutesEditFrame');
+  try{const doc=frame.contentDocument||frame.contentWindow.document;doc.open();doc.write('');doc.close();}catch(e){}
+}
+function saveMinutesEdit(){
+  if(!_editArchiveId)return;
+  const frame=document.getElementById('minutesEditFrame');
+  try{
+    const doc=frame.contentDocument||frame.contentWindow.document;
+    doc.body.contentEditable='false';
+    // Reconstruct the full HTML from the edited iframe
+    const newHtml='<!DOCTYPE html>\n<html>'+doc.documentElement.innerHTML+'</html>';
+    const a=S.archive.find(x=>x.id===_editArchiveId);
+    if(!a){closeMinutesEdit();return;}
+    a.text=newHtml;
+    if(_fbAvailable&&ARCHIVE_REF){
+      ARCHIVE_REF.child(_editArchiveId).update({text:newHtml,lastEdited:new Date().toLocaleString()})
+        .then(()=>{closeMinutesEdit();renderPastMinutes();});
+    } else {
+      closeMinutesEdit();renderPastMinutes();
+    }
+  }catch(e){alert('Could not save changes: '+e.message);}
 }
 function openArchive(id){
   const a=S.archive.find(x=>x.id===id);if(!a)return;
