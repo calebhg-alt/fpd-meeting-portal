@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
 <style>
 :root{
   --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -98,6 +99,9 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 .member-info{flex:1;min-width:0}
 .member-name{font-size:13px;font-weight:500;color:var(--color-text-primary);line-height:1.3}
 .member-role-txt{font-size:11px;color:var(--color-text-secondary);margin-top:1px}
+.member-card.drag-over{border-color:#4E9BAD !important;background:#e6f3f6 !important;}
+.member-card[draggable]{cursor:grab;}
+.member-card[draggable]:active{cursor:grabbing;}
 .att-badge{font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;white-space:nowrap}
 .att-present{background:#d6edf2;color:#1e5e6e}.att-override{background:#fdf0e6;color:#944d0e}.att-absent-b{background:var(--color-background-secondary);color:var(--color-text-secondary)}
 .quorum-bar{height:6px;background:var(--color-background-secondary);border-radius:999px;overflow:hidden;margin:6px 0 4px}
@@ -367,7 +371,13 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
       <div class="quorum-bar"><div class="q-fill" id="quorumFill"></div></div>
       <div style="font-size:11px;color:var(--color-text-secondary)" id="quorumText"></div>
     </div>
-    <div class="sec-hd" style="margin-bottom:8px">Members &amp; attendance</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      <div class="sec-hd" style="margin-bottom:0">Members &amp; attendance</div>
+      <div id="rosterSortBtns" style="display:none;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-xs" onclick="sortRosterBy('first')" title="Sort by first name"><i class="ti ti-sort-ascending-letters" style="font-size:11px"></i> First</button>
+        <button class="btn btn-xs" onclick="sortRosterBy('last')" title="Sort by last name"><i class="ti ti-sort-ascending-letters" style="font-size:11px"></i> Last</button>
+      </div>
+    </div>
     <div id="memberList"></div>
     <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-success" id="callOrderBtn" onclick="callToOrder()" style="display:none"><i class="ti ti-gavel"></i> Call to order</button>
@@ -390,7 +400,8 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <div class="sec-hd" style="margin-bottom:0">Agenda (<span id="agCount">0</span> items)</div>
-      <button class="btn btn-sm" onclick="exportAgendaDoc()" title="Export agenda as printable PDF"><i class="ti ti-printer"></i> Export Agenda</button>
+      <button class="btn btn-sm" onclick="exportAgendaDoc()" title="Print / PDF"><i class="ti ti-printer"></i> Print</button>
+      <button class="btn btn-sm btn-primary" onclick="exportAgendaDocx()" title="Download as Word document"><i class="ti ti-file-type-doc"></i> Word (.docx)</button>
     </div>
     <div id="agendaList"></div>
   </div>
@@ -399,7 +410,8 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
       <div class="sec-hd" style="margin-bottom:0">Meeting record</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="exportMinutesDoc()"><i class="ti ti-printer"></i> Export Minutes</button>
+        <button class="btn btn-sm" onclick="exportMinutesDoc()"><i class="ti ti-printer"></i> Print</button>
+        <button class="btn btn-sm btn-primary" onclick="exportMinutesDocx()"><i class="ti ti-file-type-doc"></i> Word (.docx)</button>
         <button class="btn btn-sm btn-success" onclick="saveMinutesManual()"><i class="ti ti-archive"></i> Save to archive</button>
       </div>
     </div>
@@ -561,7 +573,7 @@ function pushToFirebase(){
   _lastPushId=_DEVICE_ID+'_'+Date.now();
   const payload={
     status:S.status,broadcastItem:S.broadcastItem||null,mtg:S.mtg,
-    members:S.members.map(m=>({id:m.id,attendance:m.attendance})),
+    members:S.members.map(m=>({id:m.id,attendance:m.attendance,forcedOut:m.forcedOut||false,displayOrder:m.displayOrder||0})),
     agenda:S.agenda.map(a=>({id:a.id,status:a.status,voteOpen:!!a.voteOpen,motionOpen:!!a.motionOpen,
       motioner:a.motioner||null,seconder:a.seconder||null,votes:a.votes||{},notes:a.notes||[],attachments:a.attachments||[]})),
     minutes:S.minutes,ts:Date.now(),pushedBy:_lastPushId
@@ -574,7 +586,7 @@ function applyFirebaseData(d){
   if(d.broadcastItem!==undefined)S.broadcastItem=d.broadcastItem;
   if(d.mtg)Object.assign(S.mtg,d.mtg);
   if(d.members){
-    d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm)lm.attendance=dm.attendance;});
+    d.members.forEach(dm=>{const lm=S.members.find(x=>x.id===dm.id);if(lm){lm.attendance=dm.attendance;if(dm.forcedOut!==undefined)lm.forcedOut=dm.forcedOut;if(dm.displayOrder!==undefined)lm.displayOrder=dm.displayOrder;}});
     // Re-assert the logged-in user's presence — Firebase lag on concurrent pushes can reset it to absent
     if(S.currentUser){
       const cu=S.members.find(m=>m.id===S.currentUser.id);
@@ -601,6 +613,13 @@ if(_fbAvailable){
     const prevStatus=S.status;
     applyFirebaseData(d);
     if(S.currentUser){
+      // Check if host forced us out
+      const meCurrent=S.members.find(x=>x.id===S.currentUser.id);
+      if(meCurrent&&meCurrent.forcedOut){
+        meCurrent.forcedOut=false;
+        doLogout();
+        return;
+      }
       refreshAll();
       // If host concluded/adjourned, send all participants to the Now panel
       if(prevStatus!==S.status&&(S.status==='adjourned'||S.status==='notstarted')){
@@ -728,8 +747,11 @@ function autoCloseVoting(a){
     const second=S.members.find(m=>m.id===a.seconder);
     const present=S.members.filter(m=>!m.vacant&&isPresent(m));
     const roll=present.map(m=>m.name+': '+(a.votes[m.id]?VOTE_LABELS[a.votes[m.id]]:'—')).join(', ');
-    addMinute('['+a.title+'] '+(mover?'Moved by '+mover.name+'. ':'')+(second?'Seconded by '+second.name+'. ':'')+
-      'Roll call: '+roll+'. Result: Yes '+yes+', No '+no+(abs?', Abstain '+abs:'')+(absent?', Absent '+absent:'')+'. Motion '+res+'.','decision');
+    const voteText=(mover?'Moved by '+mover.name+'. ':'')+(second?'Seconded by '+second.name+'. ':'')+
+      'Roll call: '+roll+'. Result: Yes '+yes+', No '+no+(abs?', Abstain '+abs:'')+(absent?', Absent '+absent:'')+'. Motion '+res+'.';
+    addMinute('['+a.title+'] '+voteText,'decision');
+    if(!a.notes)a.notes=[];
+    a.notes.push({text:voteText,type:'decision',ts:ts(),isVote:true});
     pushNotification(a);
   }
   a.status='complete';
@@ -738,7 +760,7 @@ function addMinute(text,type){S.minutes.push({text,type:type||'note',ts:ts()})}
 
 // ── Init ──
 function init(){
-  MEMBERS_SEED.forEach((m,i)=>S.members.push({id:m.id,name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6]}));
+  MEMBERS_SEED.forEach((m,i)=>S.members.push({id:m.id,name:m.name,role:m.role,vacant:!!m.vacant,attendance:false,color:m.vacant?'av-gray':AV[i%6],displayOrder:i,forcedOut:false}));
   seedAgenda('2026-04-22');
   // load Firebase archive only if available
   if(_fbAvailable&&ARCHIVE_REF){
@@ -786,6 +808,18 @@ function doLogout(){
   document.getElementById('mainScreen').classList.remove('active');
   document.getElementById('loginScreen').classList.add('active');
 }
+function hostLogout(memberId){
+  if(!isAdmin())return;
+  const m=S.members.find(x=>x.id===memberId);
+  if(!m)return;
+  if(!confirm('Sign out '+m.name+' from the app?\nThey will be returned to the sign-in screen.'))return;
+  m.attendance=false;
+  m.forcedOut=true;
+  pushToFirebase();
+  // Clear flag after push so it doesn't persist
+  setTimeout(()=>{m.forcedOut=false;pushToFirebase();},2000);
+  renderRoster();
+}
 function enterApp(){
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('mainScreen').classList.add('active');
@@ -795,6 +829,7 @@ function enterApp(){
   const admin=isAdmin();
   document.getElementById('calendarTab').style.display=admin?'flex':'none';
   document.getElementById('adminAddMember').style.display=admin?'block':'none';
+  document.getElementById('rosterSortBtns').style.display=admin?'flex':'none';
   document.getElementById('adminAddAgenda').style.display=admin?'block':'none';
   document.getElementById('clearArchiveBtn').style.display=admin?'inline-flex':'none';
   document.getElementById('settingsBtn').style.display=admin?'inline-flex':'none';
@@ -1222,19 +1257,72 @@ function renderRoster(){
     document.getElementById('quorumFill').className='q-fill '+(met?'q-met':'q-short');
     document.getElementById('quorumText').textContent=p+' of '+t+' eligible present · Need '+need+' · '+(met?'Quorum met ✓':'Quorum not met');
   }
-  el.innerHTML=S.members.map(m=>{
+  const sortedMembers=[...S.members].sort((a,b)=>(a.displayOrder||0)-(b.displayOrder||0));
+  el.innerHTML=sortedMembers.map(m=>{
     let attBadge='',attBtn='';
     if(m.vacant){attBadge='<span style="font-size:11px;color:var(--color-text-secondary)">Vacant</span>';}
-    else if(m.attendance==='app'){attBadge='<span class="att-badge att-present"><i class="ti ti-device-mobile" style="font-size:10px"></i> Signed in</span>';if(isAdmin())attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>`;}
+    else if(m.attendance==='app'){
+      attBadge='<span class="att-badge att-present"><i class="ti ti-device-mobile" style="font-size:10px"></i> Signed in</span>';
+      if(isAdmin()){
+        const logoutBtn=m.id!==S.currentUser?.id?`<button class="btn btn-xs btn-warn" style="margin-left:4px;font-size:11px" onclick="hostLogout('${m.id}')" title="Sign out this user"><i class="ti ti-logout" style="font-size:10px"></i></button>`:'';
+        attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>${logoutBtn}`;
+      }
+    }
     else if(m.attendance==='override'){attBadge='<span class="att-badge att-override"><i class="ti ti-user-check" style="font-size:10px"></i> Present</span>';if(isAdmin())attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>`;}
     else{attBadge='<span class="att-badge att-absent-b">Absent</span>';if(isAdmin())attBtn=`<button class="btn btn-xs btn-success" style="margin-left:5px;font-size:11px" onclick="chairToggleAttendance('${m.id}')"><i class="ti ti-user-check"></i> Mark present</button>`;}
-    return`<div class="member-card ${m.vacant?'vacant-card':''}">
+    const adminDrag=isAdmin()&&!m.vacant?`draggable="true" ondragstart="rosterDragStart(event,'${m.id}')" ondragover="rosterDragOver(event)" ondrop="rosterDrop(event,'${m.id}')" ondragleave="rosterDragLeave(event)"`:'';
+    return`<div class="member-card ${m.vacant?'vacant-card':''}" ${adminDrag}>
       <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
       <div class="member-info"><div class="member-name">${esc(m.name)}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
       <div style="display:flex;align-items:center">${attBadge}${attBtn}</div>
       ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
     </div>`;
   }).join('');
+}
+
+// ── Roster sort & drag ──
+function sortRosterBy(by){
+  if(!isAdmin())return;
+  const sorted=[...S.members].sort((a,b)=>{
+    if(a.vacant&&!b.vacant)return 1;if(!a.vacant&&b.vacant)return -1;
+    if(by==='last'){
+      const la=(a.name.trim().split(' ').slice(-1)[0]||'').toLowerCase();
+      const lb=(b.name.trim().split(' ').slice(-1)[0]||'').toLowerCase();
+      return la.localeCompare(lb);
+    }
+    return a.name.trim().toLowerCase().localeCompare(b.name.trim().toLowerCase());
+  });
+  sorted.forEach((m,i)=>m.displayOrder=i);
+  pushToFirebase();renderRoster();
+}
+let _dragSrcId=null;
+function rosterDragStart(e,id){
+  _dragSrcId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.style.opacity='0.5';
+}
+function rosterDragOver(e){
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  e.currentTarget.classList.add('drag-over');
+}
+function rosterDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function rosterDrop(e,targetId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(e.currentTarget)e.currentTarget.style.opacity='';
+  if(!_dragSrcId||_dragSrcId===targetId){_dragSrcId=null;return;}
+  const srcM=S.members.find(m=>m.id===_dragSrcId);
+  const tgtM=S.members.find(m=>m.id===targetId);
+  if(!srcM||!tgtM){_dragSrcId=null;return;}
+  // Re-index so we have stable ordinals, then insert src before/after tgt
+  const sorted=[...S.members].sort((a,b)=>(a.displayOrder||0)-(b.displayOrder||0));
+  const srcIdx=sorted.indexOf(srcM);
+  const tgtIdx=sorted.indexOf(tgtM);
+  sorted.splice(srcIdx,1);
+  sorted.splice(tgtIdx,0,srcM);
+  sorted.forEach((m,i)=>m.displayOrder=i);
+  _dragSrcId=null;
+  pushToFirebase();renderRoster();
 }
 
 // ── Panels ──
@@ -1574,9 +1662,7 @@ function renderNow(){
 // ── Advance to next meeting (without full conclude flow) ──
 function advanceToNextMeeting(afterFn){
   if(!isAdmin())return;
-  // Use first non-completed calendar entry sorted by date.
-  // concludeMeeting sets curCal.status='completed' in memory before calling this,
-  // so the just-concluded meeting is already excluded.
+  // Use first non-completed calendar entry (includes same-day entries not yet concluded)
   const next=S.calendar.filter(c=>c.status!=='completed').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   if(!next){alert('No future meetings scheduled. Add dates in the Calendar tab first.');return}
   const prevDate=S.mtg.date;
@@ -1606,7 +1692,7 @@ function advanceToNextMeeting(afterFn){
 }
 
 
-// ── Sync & call to order (handles corrupted/stale S.mtg.date) ──
+// ── callOrderViaSync: handles date mismatch before calling to order ──
 function callOrderViaSync(calId){
   if(!isAdmin())return;
   const cal=S.calendar.find(c=>c.id===calId);
@@ -1614,8 +1700,6 @@ function callOrderViaSync(calId){
   if(S.mtg.date===cal.date){
     callToOrder();
   } else {
-    // S.mtg is out of sync — advance to the first non-completed meeting
-    // (which is this calendar entry) then call to order
     advanceToNextMeeting(callToOrder);
   }
 }
@@ -1882,6 +1966,7 @@ function renderPastMinutes(){
           ? `<button class="btn btn-sm btn-primary" onclick="openArchive('${a.id}')"><i class="ti ti-external-link"></i> Open / Print</button>`
           : `<button class="btn btn-sm" onclick="dlArchive('${a.id}')"><i class="ti ti-download"></i> Download</button>`
         }
+        ${isAdmin()&&(a.type==='minutes'||(!a.type&&a.text))?`<button class="btn btn-sm btn-primary" onclick="editArchiveEntry('${a.id}')"><i class="ti ti-edit"></i> Edit</button>`:''}
         <button class="btn btn-sm btn-danger" onclick="deleteOne('${a.id}')"><i class="ti ti-trash"></i> Delete</button>
       </div>
       ${a.isHtml ? '' : `<div class="past-text">${esc(a.text)}</div>`}
@@ -1890,6 +1975,45 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
+function editArchiveEntry(id){
+  if(!isAdmin())return;
+  const code=prompt('Enter access code to edit minutes:');
+  if(!code)return;
+  if(code.trim()!==PASSWORD){alert('Incorrect access code.');return;}
+  const a=S.archive.find(x=>x.id===id);if(!a)return;
+  const body=document.getElementById('pb_'+id);if(!body)return;
+  // Show inline editor
+  const existing=document.getElementById('archedit_'+id);
+  if(existing){existing.remove();return;}
+  const editor=document.createElement('div');
+  editor.id='archedit_'+id;
+  editor.style.cssText='margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px';
+  editor.innerHTML=`
+    <div style="font-size:12px;font-weight:600;color:var(--color-text-secondary);margin-bottom:6px"><i class="ti ti-edit" style="font-size:12px"></i> Edit minutes</div>
+    <textarea id="archedit_ta_${id}" style="width:100%;min-height:200px;font-family:var(--font-sans);font-size:12px;line-height:1.6;resize:vertical;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px">${(a.text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="btn btn-sm btn-success" onclick="saveArchiveEdit('${id}')"><i class="ti ti-device-floppy"></i> Save changes</button>
+      <button class="btn btn-sm" onclick="document.getElementById('archedit_${id}').remove()">Cancel</button>
+    </div>`;
+  body.appendChild(editor);
+  document.getElementById('archedit_ta_'+id).focus();
+}
+function saveArchiveEdit(id){
+  const ta=document.getElementById('archedit_ta_'+id);if(!ta)return;
+  const newText=ta.value;
+  const a=S.archive.find(x=>x.id===id);if(!a)return;
+  a.text=newText;
+  if(_fbAvailable&&ARCHIVE_REF){
+    ARCHIVE_REF.child(id).update({text:newText,lastEdited:new Date().toLocaleString()})
+      .then(()=>{
+        document.getElementById('archedit_'+id).remove();
+        renderPastMinutes();
+      });
+  } else {
+    document.getElementById('archedit_'+id).remove();
+    renderPastMinutes();
+  }
+}
 function openArchive(id){
   const a=S.archive.find(x=>x.id===id);if(!a)return;
   const w=window.open('','_blank');
@@ -1910,6 +2034,74 @@ function uploadMinutes(e){
     e.target.value='';
   };r.readAsText(f);
 }
+// ── DOCX export ──
+function exportAgendaDocx(){
+  if(typeof docx==='undefined'){alert('Word export library not loaded. Please check your internet connection and reload the page.');return;}
+  const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
+  const dateStr=fmtDateShort(S.mtg.date);
+  const timeStr=(S.mtg.start&&S.mtg.end)?fmtTime12(S.mtg.start)+' – '+fmtTime12(S.mtg.end):fmtTime12(S.mtg.start)||'';
+  const children=[
+    new Paragraph({children:[new TextRun({text:'ANTELOPE VALLEY COLLEGE',bold:true,size:24})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:S.mtg.name,bold:true,size:22})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:'AGENDA',bold:true,size:22})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:dateStr+(timeStr?' · '+timeStr:'')+(S.mtg.loc?' · '+S.mtg.loc:''),size:20})],alignment:AlignmentType.CENTER}),
+    new Paragraph({text:'',spacing:{after:240}}),
+  ];
+  S.agenda.forEach((a,i)=>{
+    children.push(new Paragraph({children:[new TextRun({text:(i+1)+'. ['+TYPE_LABELS[a.type]+'] '+a.title,bold:true,size:22})],spacing:{before:240,after:80}}));
+    if(a.desc)children.push(new Paragraph({children:[new TextRun({text:a.desc,size:20,color:'444444'})],spacing:{after:120}}));
+  });
+  const doc=new Document({sections:[{properties:{},children}]});
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const lnk=document.createElement('a');
+    lnk.href=url;lnk.download=(S.mtg.name+'_Agenda_'+S.mtg.date).replace(/[^a-z0-9]/gi,'_')+'.docx';
+    lnk.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  });
+}
+function exportMinutesDocx(){
+  if(typeof docx==='undefined'){alert('Word export library not loaded. Please check your internet connection and reload the page.');return;}
+  const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
+  const dateStr=fmtDateShort(S.mtg.date);
+  const timeStr=(S.mtg.start&&S.mtg.end)?fmtTime12(S.mtg.start)+' – '+fmtTime12(S.mtg.end):fmtTime12(S.mtg.start)||'';
+  const children=[
+    new Paragraph({children:[new TextRun({text:'ANTELOPE VALLEY COLLEGE',bold:true,size:24})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:S.mtg.name,bold:true,size:22})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:'MEETING MINUTES',bold:true,size:22})],alignment:AlignmentType.CENTER}),
+    new Paragraph({children:[new TextRun({text:dateStr+(timeStr?' · '+timeStr:'')+(S.mtg.loc?' · '+S.mtg.loc:''),size:20})],alignment:AlignmentType.CENTER}),
+    new Paragraph({text:'',spacing:{after:240}}),
+  ];
+  const present=S.members.filter(m=>!m.vacant&&(m.attendance==='app'||m.attendance==='override'));
+  const absent=S.members.filter(m=>!m.vacant&&m.attendance!=='app'&&m.attendance!=='override');
+  if(present.length){
+    children.push(new Paragraph({children:[new TextRun({text:'Members Present',bold:true,size:22})],spacing:{before:200,after:80}}));
+    present.forEach(m=>children.push(new Paragraph({children:[new TextRun({text:m.name+' – '+m.role,size:20})]})));
+    children.push(new Paragraph({text:'',spacing:{after:120}}));
+  }
+  if(absent.length){
+    children.push(new Paragraph({children:[new TextRun({text:'Members Absent',bold:true,size:22})],spacing:{before:100,after:80}}));
+    absent.forEach(m=>children.push(new Paragraph({children:[new TextRun({text:m.name+' – '+m.role,size:20})]})));
+    children.push(new Paragraph({text:'',spacing:{after:120}}));
+  }
+  S.agenda.forEach((a,i)=>{
+    if(a.notes&&a.notes.length){
+      children.push(new Paragraph({children:[new TextRun({text:(i+1)+'. '+a.title,bold:true,size:22})],spacing:{before:240,after:80}}));
+      a.notes.forEach(n=>children.push(new Paragraph({children:[new TextRun({text:'['+n.ts+'] '+n.text,size:20})]})));
+    }
+  });
+  if(S.minutes&&S.minutes.length){
+    children.push(new Paragraph({children:[new TextRun({text:'General Notes',bold:true,size:22})],spacing:{before:240,after:80}}));
+    S.minutes.forEach(m=>children.push(new Paragraph({children:[new TextRun({text:'['+m.ts+'] '+m.text,size:20})]})));
+  }
+  const doc=new Document({sections:[{properties:{},children}]});
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const lnk=document.createElement('a');
+    lnk.href=url;lnk.download=(S.mtg.name+'_Minutes_'+S.mtg.date).replace(/[^a-z0-9]/gi,'_')+'.docx';
+    lnk.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  });
+}
+
 function exportTxt(){dl((S.mtg.name+'_'+S.mtg.date).replace(/[^a-z0-9]/gi,'_')+'.txt',buildMinutesText())}
 function exportAgendaDoc(){openExportWindow(false)}
 function exportMinutesDoc(){openExportWindow(true)}
