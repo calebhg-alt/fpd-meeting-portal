@@ -227,9 +227,33 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <input type="text" id="set_noteTaker" style="width:100%;font-size:13px" placeholder="Name of note taker">
     <label class="mfl">Please review / bring</label>
     <textarea id="set_reviewBring" style="width:100%;font-size:13px;resize:vertical;min-height:56px;font-family:var(--font-sans)" placeholder="Documents or items to review before meeting"></textarea>
+    <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <button class="btn" id="changePwdBtn" onclick="closeSettings();openChangePwd()" style="font-size:11px;color:var(--color-text-secondary)"><i class="ti ti-key" style="font-size:12px;vertical-align:-1px"></i> Change password</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeSettings()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="modal-overlay" id="changePwdModal">
+  <div class="modal" style="max-width:360px">
+    <h3><i class="ti ti-key" style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Change app password</h3>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">The new password applies to all participants.</p>
+    <div id="cpCurrentRow">
+      <label class="mfl">Current password</label>
+      <input type="password" id="cp_current" style="width:100%;font-size:13px" placeholder="Enter current password">
+    </div>
+    <label class="mfl">New password</label>
+    <input type="password" id="cp_new" style="width:100%;font-size:13px" placeholder="At least 3 characters">
+    <label class="mfl">Confirm new password</label>
+    <input type="password" id="cp_confirm" style="width:100%;font-size:13px" placeholder="Re-enter new password">
+    <div id="cp_err" style="display:none;color:var(--color-text-danger);font-size:12px;margin-top:6px;padding:6px 10px;background:var(--color-background-danger);border-radius:4px"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeSettings()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save</button>
+      <button class="btn" onclick="closeChangePwd()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveChangePwd()"><i class="ti ti-lock"></i> Update password</button>
     </div>
   </div>
 </div>
@@ -504,7 +528,7 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
 
 <script>
 // ── Firebase (graceful fallback if SDK unavailable) ──
-let db=null,SYNC_REF=null,ARCHIVE_REF=null,NOTIF_REF=null,CALENDAR_REF=null,FUTURE_REF=null;
+let db=null,SYNC_REF=null,ARCHIVE_REF=null,NOTIF_REF=null,CALENDAR_REF=null,FUTURE_REF=null,SETTINGS_REF=null;
 let _fbAvailable=false;
 try{
   const firebaseConfig={
@@ -523,13 +547,15 @@ try{
   NOTIF_REF=db.ref('fpd_meeting/notification');
   CALENDAR_REF=db.ref('fpd_meeting/calendar');
   FUTURE_REF=db.ref('fpd_meeting/future_agendas');
+  SETTINGS_REF=db.ref('fpd_meeting/settings');
   _fbAvailable=true;
 }catch(e){
   console.warn('Firebase unavailable — running in local-only mode.',e);
 }
 
 // ── Constants ──
-const PASSWORD='FPD-101';
+const PASSWORD_DEFAULT='FPD-101';
+const SUPER_ADMIN_CODE='7018'; // immutable — never shown in UI
 const AV=['av-blue','av-teal','av-purple','av-coral','av-amber','av-green','av-gray'];
 const TYPE_LABELS={discussion:'Discussion',action:'Action item',consent:'Consent',public:'Public comment',info:'Informational'};
 const TYPE_BADGE={discussion:'tb-discussion',action:'tb-action',consent:'tb-consent',public:'tb-public',info:'tb-info'};
@@ -578,11 +604,13 @@ const MEMBERS_SEED=[
 const S={
   currentUser:null,members:[],archive:[],calendar:[],lastNotifId:null,pastFilter:'all',
   status:'notstarted',broadcastItem:null,agenda:[],minutes:[],futureAgendas:{},
+  settings:{password:PASSWORD_DEFAULT},chairOverrides:[],
   mtg:{name:'Faculty Professional Development Committee',date:'2026-05-27',start:'14:30',end:'16:00',loc:'L201 / Zoom',meetingType:'Regular',noteTaker:'',reviewBring:''}
 };
 
 const _DEVICE_ID='dev_'+Math.random().toString(36).slice(2,10);
 let _lastPushId=null;
+let _isSuperAdmin=false; // session-local flag, never synced to Firebase
 
 // ── Firebase sync ──
 function pushToFirebase(){
@@ -660,6 +688,14 @@ if(_fbAvailable){
     if(document.getElementById('futureAgendaModal')?.classList.contains('open'))renderFutureAgendaModal();
     if(S.status==='adjourned'&&S.currentUser)renderNow();
   });
+  SETTINGS_REF.on('value',snap=>{
+    const d=snap.val();
+    if(d){
+      if(d.password)S.settings.password=d.password;
+      S.chairOverrides=d.chairOverrides||[];
+    }
+    if(S.currentUser)syncAdminUI();
+  });
   db.ref('.info/connected').on('value',snap=>{
     const c=snap.val();
     const dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');
@@ -677,7 +713,8 @@ function uid(){return Math.random().toString(36).slice(2,9)}
 function initials(n){if(!n||n==='VACANT')return'—';return String(n).split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function ts(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
-function isAdmin(){return S.currentUser&&S.currentUser.role.toLowerCase().includes('chair')}
+function isSuperAdmin(){return _isSuperAdmin&&!!S.currentUser;}
+function isAdmin(){return!!(S.currentUser&&(_isSuperAdmin||S.currentUser.role.toLowerCase().includes('chair')||S.chairOverrides.includes(S.currentUser.id)));}
 function toRoman(n){return(['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'])[n-1]||n}
 function padR(s,l){return String(s||'').padEnd(l,' ')}
 function isPresent(m){return m.attendance==='app'||m.attendance==='override'}
@@ -802,7 +839,17 @@ function seedAgenda(lastMeetingDate){
 }
 init();
 
-function refreshAll(){updateBannerText();updateBanner();renderNow();renderRoster();renderAgenda();renderMinutes();}
+function syncAdminUI(){
+  if(!S.currentUser)return;
+  const admin=isAdmin();
+  document.getElementById('calendarTab').style.display=admin?'flex':'none';
+  document.getElementById('adminAddMember').style.display=admin?'block':'none';
+  document.getElementById('rosterSortBtns').style.display=admin?'flex':'none';
+  document.getElementById('adminAddAgenda').style.display=admin?'block':'none';
+  document.getElementById('clearArchiveBtn').style.display=admin?'inline-flex':'none';
+  document.getElementById('settingsBtn').style.display=admin?'inline-flex':'none';
+}
+function refreshAll(){updateBannerText();updateBanner();renderNow();renderRoster();renderAgenda();renderMinutes();syncAdminUI();}
 function buildLoginDropdown(){
   const sel=document.getElementById('loginName');
   sel.innerHTML='<option value="">— choose your name —</option>';
@@ -813,14 +860,23 @@ function buildLoginDropdown(){
 function doLogin(){
   const mid=document.getElementById('loginName').value,pass=document.getElementById('loginPass').value;
   if(!mid){showErr('Please select your name.');return}
-  if(pass!==PASSWORD){showErr('Incorrect password.');return}
   const m=S.members.find(x=>x.id===mid);if(!m){showErr('Not found.');return}
+  // Super-admin code grants full access as selected member
+  if(pass===SUPER_ADMIN_CODE){
+    document.getElementById('loginErr').style.display='none';
+    _isSuperAdmin=true;
+    S.currentUser=m;if(m.attendance!=='app')m.attendance='app';
+    pushToFirebase();enterApp();return;
+  }
+  if(pass!==S.settings.password){showErr('Incorrect password.');return}
   document.getElementById('loginErr').style.display='none';
+  _isSuperAdmin=false;
   S.currentUser=m;if(m.attendance!=='app')m.attendance='app';
   pushToFirebase();enterApp();
 }
 function showErr(msg){const e=document.getElementById('loginErr');e.textContent=msg;e.style.display='block'}
 function doLogout(){
+  _isSuperAdmin=false;
   S.currentUser=null;document.getElementById('loginPass').value='';buildLoginDropdown();
   document.getElementById('mainScreen').classList.remove('active');
   document.getElementById('loginScreen').classList.add('active');
@@ -885,6 +941,7 @@ function saveSettings(){
   updateBannerText();pushToFirebase();closeSettings();
 }
 document.getElementById('settingsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSettings()});
+document.getElementById('changePwdModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeChangePwd()});
 document.getElementById('addMtgModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddMtg()});
 document.getElementById('seriesModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSeriesModal()});
 document.getElementById('editCalModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditCal()});
@@ -1172,6 +1229,48 @@ function clearCalendar(){
   if(!_fbAvailable||!confirm('Remove all scheduled meetings?'))return;
   CALENDAR_REF.remove();
 }
+// ── Settings & password management ──
+function pushSettings(){
+  if(!_fbAvailable||!SETTINGS_REF)return;
+  SETTINGS_REF.set({password:S.settings.password,chairOverrides:S.chairOverrides});
+}
+function openChangePwd(){
+  if(!isAdmin())return;
+  document.getElementById('cp_current').value='';
+  document.getElementById('cp_new').value='';
+  document.getElementById('cp_confirm').value='';
+  document.getElementById('cp_err').style.display='none';
+  // Super-admin skips entering the current password
+  document.getElementById('cpCurrentRow').style.display=isSuperAdmin()?'none':'block';
+  document.getElementById('changePwdModal').classList.add('open');
+}
+function closeChangePwd(){document.getElementById('changePwdModal').classList.remove('open');}
+function saveChangePwd(){
+  const curr=document.getElementById('cp_current').value;
+  const newPwd=document.getElementById('cp_new').value.trim();
+  const conf=document.getElementById('cp_confirm').value.trim();
+  const errEl=document.getElementById('cp_err');
+  if(!isSuperAdmin()&&curr!==S.settings.password){errEl.textContent='Current password is incorrect.';errEl.style.display='block';return;}
+  if(newPwd.length<3){errEl.textContent='Password must be at least 3 characters.';errEl.style.display='block';return;}
+  if(newPwd===SUPER_ADMIN_CODE){errEl.textContent='That value is reserved and cannot be used as a password.';errEl.style.display='block';return;}
+  if(newPwd!==conf){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
+  S.settings.password=newPwd;
+  pushSettings();closeChangePwd();
+  alert('Password updated. All participants will need to use the new password to sign in.');
+}
+// ── Chair override (super-admin only) ──
+function toggleChairOverride(memberId){
+  if(!isSuperAdmin())return;
+  const m=S.members.find(x=>x.id===memberId);
+  if(!m||m.vacant)return;
+  if(m.role.toLowerCase().includes('chair')){alert(m.name+' already holds a Chair role.');return;}
+  if(S.chairOverrides.includes(memberId)){
+    S.chairOverrides=S.chairOverrides.filter(id=>id!==memberId);
+  } else {
+    S.chairOverrides.push(memberId);
+  }
+  pushSettings();syncAdminUI();renderRoster();
+}
 function openSeriesModal(){
   document.getElementById('ser_loc').value=S.mtg.loc;
   document.getElementById('seriesModal').classList.add('open');
@@ -1336,10 +1435,19 @@ function renderRoster(){
     else if(m.attendance==='override'){attBadge='<span class="att-badge att-override"><i class="ti ti-user-check" style="font-size:10px"></i> Present</span>';if(isAdmin())attBtn=`<button class="btn btn-xs" style="margin-left:5px;font-size:11px;color:var(--color-text-danger)" onclick="chairToggleAttendance('${m.id}')" title="Mark absent">✕</button>`;}
     else{attBadge='<span class="att-badge att-absent-b">Absent</span>';if(isAdmin())attBtn=`<button class="btn btn-xs btn-success" style="margin-left:5px;font-size:11px" onclick="chairToggleAttendance('${m.id}')"><i class="ti ti-user-check"></i> Mark present</button>`;}
     const adminDrag=isAdmin()&&!m.vacant?`draggable="true" ondragstart="rosterDragStart(event,'${m.id}')" ondragover="rosterDragOver(event)" ondrop="rosterDrop(event,'${m.id}')" ondragleave="rosterDragLeave(event)"`:'';
+    const hasChairRole=m.role.toLowerCase().includes('chair');
+    const hasOverride=S.chairOverrides.includes(m.id);
+    // Crown button: super-admin can grant/revoke chair authority on non-chair, non-vacant members
+    const crownBtn=isSuperAdmin()&&!m.vacant&&!hasChairRole
+      ?`<button class="btn btn-xs" title="${hasOverride?'Revoke chair authority':'Grant chair authority'}"
+          onclick="toggleChairOverride('${m.id}')"
+          style="margin-left:4px;font-size:11px;padding:2px 6px;${hasOverride?'color:#b57e00;background:#fff8e1;border-color:#f0c040;':'color:var(--color-text-secondary);'}">
+          <i class="ti ti-crown" style="font-size:12px;vertical-align:-1px"></i>${hasOverride?' <span style="font-size:10px;font-weight:700">Chair</span>':''}</button>`
+      :'';
     return`<div class="member-card ${m.vacant?'vacant-card':''}" ${adminDrag}>
       <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
-      <div class="member-info"><div class="member-name">${esc(m.vacant?m.name:fmtMemberName(m.name))}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
-      <div style="display:flex;align-items:center">${attBadge}${attBtn}</div>
+      <div class="member-info"><div class="member-name">${esc(m.vacant?m.name:fmtMemberName(m.name))}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}${hasOverride?'<i class="ti ti-crown" style="font-size:10px;color:#b57e00;margin-left:4px" title="Chair authority granted"></i>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${attBadge}${attBtn}${crownBtn}</div>
       ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
     </div>`;
   }).join('');
