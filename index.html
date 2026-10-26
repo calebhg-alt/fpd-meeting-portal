@@ -227,12 +227,39 @@ input:focus,select:focus,textarea:focus{border-color:#4E9BAD}
     <input type="text" id="set_noteTaker" style="width:100%;font-size:13px" placeholder="Name of note taker">
     <label class="mfl">Please review / bring</label>
     <textarea id="set_reviewBring" style="width:100%;font-size:13px;resize:vertical;min-height:56px;font-family:var(--font-sans)" placeholder="Documents or items to review before meeting"></textarea>
-    <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <button class="btn" id="changePwdBtn" onclick="closeSettings();openChangePwd()" style="font-size:11px;color:var(--color-text-secondary)"><i class="ti ti-key" style="font-size:12px;vertical-align:-1px"></i> Change password</button>
-      <div style="display:flex;gap:8px">
-        <button class="btn" onclick="closeSettings()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save</button>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MEMBER MODAL -->
+<div class="modal-overlay" id="editMemberModal">
+  <div class="modal" style="max-width:360px">
+    <h3><i class="ti ti-user-edit" style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Edit member</h3>
+    <input type="hidden" id="em_id">
+    <label class="mfl">Name</label>
+    <input type="text" id="em_name" style="width:100%;font-size:13px">
+    <label class="mfl">Role / title</label>
+    <input type="text" id="em_role" style="width:100%;font-size:13px">
+    <div id="emCrownRow" style="display:none;margin-top:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:1px solid var(--color-border-secondary)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-secondary);margin-bottom:8px"><i class="ti ti-crown" style="font-size:11px;vertical-align:-1px;color:#b57e00"></i> Chair authority</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span id="emCrownStatus" style="font-size:12px"></span>
+        <button class="btn btn-xs" id="emCrownBtn" onclick="toggleChairOverrideFromModal()"></button>
       </div>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:1px solid var(--color-border-secondary)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-secondary);margin-bottom:8px"><i class="ti ti-key" style="font-size:11px;vertical-align:-1px"></i> App password</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-xs" onclick="resetPwdToDefault()" style="font-size:11px"><i class="ti ti-refresh" style="font-size:10px;vertical-align:-1px"></i> Reset to default</button>
+        <button class="btn btn-xs" onclick="closeEditMember();openChangePwd()" style="font-size:11px"><i class="ti ti-lock" style="font-size:10px;vertical-align:-1px"></i> Change password…</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditMember()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditMember()"><i class="ti ti-check"></i> Save</button>
     </div>
   </div>
 </div>
@@ -941,6 +968,7 @@ function saveSettings(){
   updateBannerText();pushToFirebase();closeSettings();
 }
 document.getElementById('settingsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSettings()});
+document.getElementById('editMemberModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditMember()});
 document.getElementById('changePwdModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeChangePwd()});
 document.getElementById('addMtgModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddMtg()});
 document.getElementById('seriesModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeSeriesModal()});
@@ -1271,6 +1299,53 @@ function toggleChairOverride(memberId){
   }
   pushSettings();syncAdminUI();renderRoster();
 }
+// ── Edit member modal ──
+let _editMemberId=null;
+function openEditMember(id){
+  if(!isAdmin())return;
+  const m=S.members.find(x=>x.id===id);
+  if(!m||m.vacant)return;
+  _editMemberId=id;
+  document.getElementById('em_id').value=id;
+  document.getElementById('em_name').value=m.name;
+  document.getElementById('em_role').value=m.role;
+  const hasChairRole=m.role.toLowerCase().includes('chair');
+  const crownRow=document.getElementById('emCrownRow');
+  if(isSuperAdmin()&&!hasChairRole){crownRow.style.display='block';refreshEmCrown();}
+  else{crownRow.style.display='none';}
+  document.getElementById('editMemberModal').classList.add('open');
+  setTimeout(()=>{const n=document.getElementById('em_name');if(n){n.focus();n.select();}},80);
+}
+function refreshEmCrown(){
+  if(!_editMemberId)return;
+  const hasOverride=S.chairOverrides.includes(_editMemberId);
+  const statusEl=document.getElementById('emCrownStatus');
+  const btn=document.getElementById('emCrownBtn');
+  if(statusEl){statusEl.textContent=hasOverride?'Chair authority granted':'Not granted';statusEl.style.color=hasOverride?'#b57e00':'var(--color-text-secondary)';}
+  if(btn){btn.innerHTML=hasOverride?'<i class="ti ti-crown"></i> Revoke':'<i class="ti ti-crown"></i> Grant';btn.style.cssText=hasOverride?'color:var(--color-text-danger)':'';}
+}
+function closeEditMember(){document.getElementById('editMemberModal').classList.remove('open');_editMemberId=null;}
+function saveEditMember(){
+  const id=document.getElementById('em_id').value;
+  const name=document.getElementById('em_name').value.trim();
+  const role=document.getElementById('em_role').value.trim();
+  if(!name)return;
+  const m=S.members.find(x=>x.id===id);if(!m)return;
+  m.name=name;m.role=role;
+  pushToFirebase();buildLoginDropdown();renderRoster();closeEditMember();
+}
+function toggleChairOverrideFromModal(){
+  if(!_editMemberId)return;
+  toggleChairOverride(_editMemberId);
+  refreshEmCrown();
+}
+function resetPwdToDefault(){
+  if(!isAdmin())return;
+  if(!confirm('Reset the app password to the default?\nAll participants will need to use "FPD-101" to sign in.'))return;
+  S.settings.password=PASSWORD_DEFAULT;
+  pushSettings();closeEditMember();
+  alert('Password has been reset to FPD-101.');
+}
 function openSeriesModal(){
   document.getElementById('ser_loc').value=S.mtg.loc;
   document.getElementById('seriesModal').classList.add('open');
@@ -1444,11 +1519,12 @@ function renderRoster(){
           style="margin-left:4px;font-size:11px;padding:2px 6px;${hasOverride?'color:#b57e00;background:#fff8e1;border-color:#f0c040;':'color:var(--color-text-secondary);'}">
           <i class="ti ti-crown" style="font-size:12px;vertical-align:-1px"></i>${hasOverride?' <span style="font-size:10px;font-weight:700">Chair</span>':''}</button>`
       :'';
+    const editableInfo=isAdmin()&&!m.vacant;
     return`<div class="member-card ${m.vacant?'vacant-card':''}" ${adminDrag}>
       <div class="avatar ${m.color}">${m.vacant?'—':initials(m.name)}</div>
-      <div class="member-info"><div class="member-name">${esc(m.vacant?m.name:fmtMemberName(m.name))}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}${hasOverride?'<i class="ti ti-crown" style="font-size:10px;color:#b57e00;margin-left:4px" title="Chair authority granted"></i>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
+      <div class="member-info"${editableInfo?` onclick="event.stopPropagation();openEditMember('${m.id}')" title="Edit member" style="cursor:pointer"`:''}><div class="member-name">${esc(m.vacant?m.name:fmtMemberName(m.name))}${m.id===S.currentUser?.id?' <span style="font-size:11px;color:#2a6e80">(you)</span>':''}${hasOverride?'<i class="ti ti-crown" style="font-size:10px;color:#b57e00;margin-left:4px" title="Chair authority granted"></i>':''}${editableInfo?'<i class="ti ti-pencil" style="font-size:9px;color:var(--color-text-secondary);margin-left:5px;opacity:0.45" title="Edit"></i>':''}</div><div class="member-role-txt">${esc(m.role)}</div></div>
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${attBadge}${attBtn}${crownBtn}</div>
-      ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
+      ${isAdmin()&&!m.vacant&&m.id!==S.currentUser?.id?`<button class="btn btn-xs" style="color:var(--color-text-danger);margin-left:6px" onclick="event.stopPropagation();removeMember('${m.id}')"><i class="ti ti-trash"></i></button>`:''}
     </div>`;
   }).join('');
 }
