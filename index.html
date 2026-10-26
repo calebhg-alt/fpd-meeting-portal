@@ -2248,6 +2248,112 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
+function exportArchiveDocx(id){
+  if(typeof docx==='undefined'){alert('Word export library not loaded. Please reload the page and try again.');return;}
+  const entry=S.archive.find(x=>x.id===id);
+  if(!entry){alert('Record not found.');return;}
+  try{
+    const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
+    const children=[];
+    // Helper: extract plain text from an HTML element
+    const gt=el=>el?el.textContent.replace(/\s+/g,' ').trim():'';
+    // Helper: add a paragraph safely
+    const addP=(text,opts={})=>{
+      const t=String(text||'').replace(/\r/g,'');
+      if(!t&&!opts.spacing)return;
+      children.push(new Paragraph({children:[new TextRun({text:t||' ',...opts})],alignment:opts.center?AlignmentType.CENTER:undefined,spacing:opts.spacing}));
+    };
+    if(entry.isHtml){
+      const d=new DOMParser().parseFromString(entry.text,'text/html');
+      d.querySelectorAll('script,style,button').forEach(el=>el.remove());
+      // ── Header ──
+      const tm=d.querySelector('.hdr-title-main');
+      const tsub=d.querySelector('.hdr-title-sub');
+      const hm=d.querySelector('.hdr-meta');
+      addP(gt(tm),{bold:true,size:26,center:true});
+      addP(gt(tsub),{bold:true,size:22,center:true});
+      if(hm) addP(gt(hm),{size:20,center:true});
+      addP('',{spacing:{after:160}});
+      d.querySelectorAll('.hdr-field').forEach(f=>{
+        const lbl=f.querySelector('.hdr-field-label');
+        const raw=gt(f);
+        const lblTxt=lbl?gt(lbl):'';
+        const val=raw.startsWith(lblTxt)?raw.slice(lblTxt.length).trim():raw;
+        if(val&&val.replace(/_/g,'').trim()) addP(lblTxt+' '+val,{size:20});
+      });
+      addP('',{spacing:{after:200}});
+      // ── Members table (first table) ──
+      const tables=Array.from(d.querySelectorAll('table'));
+      if(tables[0]){
+        children.push(new Paragraph({children:[new TextRun({text:'MEMBERS',bold:true,size:22})],spacing:{before:160,after:100}}));
+        Array.from(tables[0].querySelectorAll('tr')).forEach((row,ri)=>{
+          const cells=Array.from(row.querySelectorAll('td,th'));
+          if(ri===0){addP(cells.map(c=>gt(c)).join(' | '),{size:18,bold:true});}
+          else{
+            const name=gt(cells[1]||null),role=gt(cells[0]||null);
+            const pres=gt(cells[2]||null),abs=gt(cells[3]||null);
+            const status=pres==='✓'?'Present':abs==='✓'?'Absent':'';
+            if(name) addP(name+(role?' – '+role:'')+(status?' ('+status+')':''),{size:20});
+          }
+        });
+        addP('',{spacing:{after:200}});
+      }
+      // ── Agenda table (second table) ──
+      if(tables[1]){
+        children.push(new Paragraph({children:[new TextRun({text:'AGENDA ITEMS',bold:true,size:22})],spacing:{before:160,after:100}}));
+        Array.from(tables[1].querySelectorAll('tr')).forEach((row,ri)=>{
+          if(ri===0)return;
+          const cells=Array.from(row.querySelectorAll('td'));
+          if(!cells.length)return;
+          // Item title (first cell)
+          const tc=cells[0];
+          if(tc){
+            const strong=tc.querySelector('strong');
+            const num=strong?gt(strong):'';
+            const title=gt(tc).replace(num,'').trim();
+            if(num||title){
+              children.push(new Paragraph({children:[new TextRun({text:(num?num+' ':'')+title,bold:true,size:20})],spacing:{before:200,after:60}}));
+            }
+          }
+          // Last cell: Issues Discussed / Action Taken sections
+          const lc=cells[cells.length-1];
+          if(lc){
+            lc.querySelectorAll('div').forEach(div=>{
+              const u=div.querySelector('u');
+              const sp=div.querySelector('span');
+              if(u&&sp){
+                const label=gt(u),val=gt(sp);
+                if(label){children.push(new Paragraph({children:[new TextRun({text:label+':',bold:true,size:18})],spacing:{before:80}}));}
+                if(val){val.split('\n').filter(Boolean).forEach(ln=>addP(ln,{size:18}));}
+              }
+            });
+          }
+        });
+      }
+      // Fallback if no tables found
+      if(!tables.length){
+        const text=d.body.textContent||'';
+        text.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>addP(l,{size:20}));
+      }
+    } else {
+      // Plain text record
+      (entry.text||'').split('\n').forEach(ln=>addP(ln,{size:20}));
+    }
+    // Ensure at least one paragraph (docx requires it)
+    if(!children.length) children.push(new Paragraph({children:[new TextRun({text:entry.label,size:20})]}));
+    const wd=new Document({sections:[{properties:{},children}]});
+    Packer.toBlob(wd).then(blob=>{
+      const url=URL.createObjectURL(blob);
+      const lnk=document.createElement('a');
+      lnk.href=url;
+      lnk.download=entry.label.replace(/[^a-z0-9]/gi,'_')+'.docx';
+      document.body.appendChild(lnk);
+      lnk.click();
+      document.body.removeChild(lnk);
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    }).catch(e=>{alert('Export failed: '+(e&&e.message?e.message:e));});
+  }catch(e){alert('Export error: '+(e&&e.message?e.message:e));}
+}
 let _editArchiveId=null;
 function editArchiveEntry(id){
   if(!isAdmin())return;
