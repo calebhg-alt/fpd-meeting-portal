@@ -7,7 +7,23 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
+<script>
+/* Load docx library with CDN fallback */
+(function(){
+  var urls=[
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
+    'https://unpkg.com/docx@8.5.0/build/index.js'
+  ],idx=0;
+  function tryLoad(){
+    if(idx>=urls.length)return;
+    var s=document.createElement('script');
+    s.src=urls[idx++];
+    s.onerror=function(){tryLoad();};
+    document.head.appendChild(s);
+  }
+  tryLoad();
+})();
+</script>
 <style>
 :root{
   --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -2248,8 +2264,11 @@ function renderPastMinutes(){
 }
 function togglePast(id){const b=document.getElementById('pb_'+id),c=document.getElementById('pc_'+id);const open=b.style.display==='block';b.style.display=open?'none':'block';c.classList.toggle('open',!open)}
 function dlArchive(id){const a=S.archive.find(x=>x.id===id);if(a)dl(a.label.replace(/[^a-z0-9]/gi,'_').slice(0,60)+'.txt',a.text)}
-function exportArchiveDocx(id){
-  if(typeof docx==='undefined'){alert('Word export library not loaded. Please reload the page and try again.');return;}
+function exportArchiveDocx(id,_retry){
+  if(typeof docx==='undefined'){
+    if(_retry){alert('Word export library not available. Please check your connection and reload.');return;}
+    setTimeout(function(){exportArchiveDocx(id,true);},2500);return;
+  }
   const entry=S.archive.find(x=>x.id===id);
   if(!entry){alert('Record not found.');return;}
   try{
@@ -2445,8 +2464,11 @@ function uploadMinutes(e){
   };r.readAsText(f);
 }
 // ── DOCX export ──
-function exportAgendaDocx(){
-  if(typeof docx==='undefined'){alert('Word export library not loaded. Please check your internet connection and reload the page.');return;}
+function exportAgendaDocx(_retry){
+  if(typeof docx==='undefined'){
+    if(_retry){alert('Word export library not available. Please check your connection and reload.');return;}
+    setTimeout(function(){exportAgendaDocx(true);},2500);return;
+  }
   const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
   const dateStr=fmtDateShort(S.mtg.date);
   const timeStr=(S.mtg.start&&S.mtg.end)?fmtTime12(S.mtg.start)+' – '+fmtTime12(S.mtg.end):fmtTime12(S.mtg.start)||'';
@@ -2469,8 +2491,11 @@ function exportAgendaDocx(){
     lnk.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
   });
 }
-function exportMinutesDocx(){
-  if(typeof docx==='undefined'){alert('Word export library not loaded. Please check your internet connection and reload the page.');return;}
+function exportMinutesDocx(_retry){
+  if(typeof docx==='undefined'){
+    if(_retry){alert('Word export library not available. Please check your connection and reload.');return;}
+    setTimeout(function(){exportMinutesDocx(true);},2500);return;
+  }
   const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
   const dateStr=fmtDateShort(S.mtg.date);
   const timeStr=(S.mtg.start&&S.mtg.end)?fmtTime12(S.mtg.start)+' – '+fmtTime12(S.mtg.end):fmtTime12(S.mtg.start)||'';
