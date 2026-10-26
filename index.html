@@ -2235,7 +2235,8 @@ function renderPastMinutes(){
     <div class="past-body" id="pb_${a.id}">
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
         ${a.isHtml
-          ? `<button class="btn btn-sm btn-primary" onclick="openArchive('${a.id}')"><i class="ti ti-external-link"></i> Open / Print</button>`
+          ? `<button class="btn btn-sm btn-primary" onclick="openArchive('${a.id}')"><i class="ti ti-external-link"></i> Open / Print</button>
+             <button class="btn btn-sm btn-primary" onclick="exportArchiveDocx('${a.id}')"><i class="ti ti-file-type-doc"></i> Word (.docx)</button>`
           : `<button class="btn btn-sm" onclick="dlArchive('${a.id}')"><i class="ti ti-download"></i> Download</button>`
         }
         ${isAdmin()&&(a.type==='minutes'||(!a.type&&a.text))?`<button class="btn btn-sm btn-primary" onclick="editArchiveEntry('${a.id}')"><i class="ti ti-edit"></i> Edit</button>`:''}
